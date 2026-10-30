@@ -90,3 +90,10 @@
 .muestra-color .sw { height: 72px; }
 .muestra-color .info { padding: 10px 12px; font-size: var(--text-sm); }
 .muestra-color code { font-size: var(--text-xs); color: var(--tinta-2); }
+
+@media (max-width: 720px) {
+  .tablet-top { flex-wrap: wrap; padding: var(--s-2) var(--s-3); gap: var(--s-2); }
+  .tablet-top .tab-texto { display: none; }
+  .tablet-top .wordmark small { display: none; }
+  .tablet-cuerpo { padding: var(--s-4) var(--s-3); }
+}
