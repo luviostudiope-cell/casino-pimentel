@@ -40,3 +40,21 @@ end;
 $$;
 revoke execute on function public.buscar_miembros(text, int, boolean) from public, anon;
 grant execute on function public.buscar_miembros(text, int, boolean) to authenticated;
+
+-- La barra identifica al socio con su carnet (para cobrar "a cuenta del socio")
+create or replace function public.leer_carnet(p_token text)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare v_m uuid; v_r jsonb;
+begin
+  if not app.tiene_rol('barra', 'porteria', 'presidente', 'directivo', 'admin') then raise exception 'Sin permiso.'; end if;
+  v_m := app.leer_token(p_token);
+  select jsonb_build_object('miembro_id', m.id, 'socio_id', s.id, 'numero', s.numero, 'nombres', m.nombres, 'apellidos', m.apellidos,
+           'parentesco', m.parentesco, 'estado_cuenta', coalesce(e.estado_cuenta, 'al_dia'), 'saldo', coalesce(e.saldo, 0), 'estado_socio', s.estado)
+    into v_r
+    from public.miembros m join public.socios s on s.id = m.socio_id left join public.estado_socios e on e.socio_id = s.id
+   where m.id = v_m;
+  return v_r;
+end;
+$$;
+revoke execute on function public.leer_carnet(text) from public, anon;
+grant execute on function public.leer_carnet(text) to authenticated;

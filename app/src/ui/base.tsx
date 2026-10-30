@@ -52,7 +52,7 @@ export type Estado =
   | 'al_dia' | 'por_vencer' | 'deuda' | 'presente' | 'tardanza' | 'falta'
   | 'pagado' | 'pendiente' | 'vencido' | 'por_validar' | 'validado' | 'rechazado'
   | 'confirmada' | 'cancelada' | 'abierta' | 'cerrada' | 'faltante' | 'sobrante' | 'cuadrado'
-  | 'activo' | 'inactivo' | 'nuevo' | 'dentro' | 'salio' | 'preregistrado' | 'solicitado' | 'confirmado'
+  | 'activo' | 'inactivo' | 'nuevo' | 'dentro' | 'salio' | 'preregistrado' | 'solicitado' | 'confirmado' | 'anulada' | 'anulado' | 'suspendido'
 
 const ESTADOS: Record<Estado, { clase: string; texto: string; icono?: ReactNode }> = {
   al_dia: { clase: 'pill-ok', texto: 'Al día', icono: <CheckCircle2 aria-hidden /> },
@@ -78,6 +78,9 @@ const ESTADOS: Record<Estado, { clase: string; texto: string; icono?: ReactNode 
   rechazado: { clase: 'pill-peligro', texto: 'Rechazado', icono: <XCircle aria-hidden /> },
   faltante: { clase: 'pill-peligro', texto: 'Faltante', icono: <AlertCircle aria-hidden /> },
   cancelada: { clase: 'pill-neutro', texto: 'Cancelada' },
+  anulada: { clase: 'pill-neutro', texto: 'Anulada' },
+  anulado: { clase: 'pill-neutro', texto: 'Anulado' },
+  suspendido: { clase: 'pill-peligro', texto: 'Suspendido' },
   cerrada: { clase: 'pill-neutro', texto: 'Cerrada' },
   inactivo: { clase: 'pill-neutro', texto: 'Inactivo' },
   salio: { clase: 'pill-neutro', texto: 'Salió' },

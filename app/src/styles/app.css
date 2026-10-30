@@ -97,3 +97,26 @@
   .tablet-top .wordmark small { display: none; }
   .tablet-cuerpo { padding: var(--s-4) var(--s-3); }
 }
+
+/* ---------- Barra El Astillero: venta ---------- */
+.venta { display: grid; grid-template-columns: 1fr; gap: var(--s-5); align-items: start; }
+.venta-panel { display: none; }
+.venta-barra-movil { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: var(--z-nav); box-shadow: var(--shadow-3); }
+@media (min-width: 900px) {
+  .venta { grid-template-columns: minmax(0, 1fr) minmax(340px, 400px); }
+  .venta-panel { display: block; }
+  .venta-barra-movil { display: none; }
+}
+.productos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; padding-bottom: 90px; }
+@media (min-width: 900px) { .productos { padding-bottom: 0; } }
+.prod {
+  position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; text-align: left;
+  min-height: 104px; padding: 14px 16px; border-radius: 22px; border: 1.5px solid #E2D3B8;
+  background: #fff; color: var(--tinta); font: inherit; cursor: pointer;
+  box-shadow: 0 1px 2px rgba(110, 82, 50, 0.08), 0 6px 14px rgba(110, 82, 50, 0.06);
+  transition: border-color var(--dur-fast) ease;
+}
+@media (hover: hover) and (pointer: fine) { .prod:hover { border-color: var(--arena-oscura); } }
+.prod-nombre { font-weight: 700; font-size: var(--text-base); line-height: 1.2; overflow-wrap: anywhere; }
+.prod-precio { font-family: var(--font-display); font-weight: 800; font-size: var(--text-lg); color: var(--arena-tinta); }
+.prod-badge { position: absolute; top: -8px; right: -6px; min-width: 28px; height: 28px; font-size: 0.9rem; background: var(--azul); }
