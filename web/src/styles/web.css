@@ -1,0 +1,127 @@
+/* Web pública · usa los mismos tokens que la app (design/tokens.css). */
+@import "@design/base.css";
+
+body { font-size: var(--text-base); }
+.contenedor { width: 100%; max-width: 1180px; margin-inline: auto; padding-inline: var(--gutter); }
+.salto { position: absolute; left: 12px; top: -60px; z-index: 100; background: var(--azul); color: #fff; padding: 12px 18px; border-radius: 999px; font-weight: 700; text-decoration: none; transition: transform 160ms var(--ease-out); }
+.salto:focus { transform: translateY(72px); }
+
+/* ---------- Encabezado en pill ---------- */
+.cabecera { position: sticky; top: 0; z-index: 30; padding: 12px var(--gutter) 0; }
+.barra-nav {
+  max-width: 1180px; margin-inline: auto; display: flex; align-items: center; gap: 8px;
+  padding: 8px 8px 8px 18px; border-radius: 999px; background: rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px); backdrop-filter: saturate(1.4) blur(14px);
+  border: 1px solid rgba(27, 79, 143, 0.08); box-shadow: var(--shadow-1);
+}
+.marca { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--azul); margin-right: auto; min-height: 48px; }
+.marca svg { width: 38px; height: 38px; flex: none; }
+.marca b { font-family: var(--font-display); font-weight: 800; font-size: 1.15rem; letter-spacing: -0.02em; white-space: nowrap; }
+.nav-web { display: none; gap: 2px; }
+.nav-web a { position: relative; display: inline-flex; align-items: center; min-height: 48px; padding: 0 14px; border-radius: 999px; color: var(--tinta-2); font-weight: 650; text-decoration: none; transition: color 160ms ease, background-color 160ms ease; }
+.nav-web a[aria-current="page"] { color: var(--azul); background: var(--celeste); }
+@media (hover: hover) and (pointer: fine) { .nav-web a:hover { color: var(--azul); } }
+@media (min-width: 1060px) { .nav-web { display: flex; } .btn-menu { display: none !important; } }
+@media (max-width: 560px) { .barra-nav > .pill-btn.primario { display: none; } .marca b { font-size: 1.05rem; } }
+.pill-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; padding: 0 22px; border-radius: 999px;
+  font-weight: 700; font-size: var(--text-base); text-decoration: none; border: 1.5px solid transparent; white-space: nowrap;
+  transition: transform 140ms var(--ease-out), background-color 160ms ease;
+}
+.pill-btn svg { width: 20px; height: 20px; }
+.pill-btn:active { transform: scale(0.97); }
+.pill-btn.primario { background: var(--azul); color: #fff; box-shadow: 0 1px 2px rgba(18,59,109,.18), 0 6px 16px rgba(27,79,143,.18); }
+.pill-btn.secundario { background: #fff; color: var(--azul); border-color: var(--border-strong); }
+.pill-btn.arena { background: var(--arena); color: var(--arena-tinta); }
+@media (hover: hover) and (pointer: fine) { .pill-btn.primario:hover { background: var(--azul-activo); } .pill-btn.secundario:hover { background: var(--celeste); } }
+.btn-menu { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 16px; border-radius: 999px; border: 0; background: var(--celeste); color: var(--azul); font-weight: 700; cursor: pointer; }
+.btn-menu svg { width: 22px; height: 22px; }
+
+/* Menú en hoja inferior (celular) */
+.velo { position: fixed; inset: 0; background: var(--scrim); opacity: 0; pointer-events: none; transition: opacity 250ms var(--ease-out); z-index: 40; }
+.hoja-menu { position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; background: #fff; border-radius: 28px 28px 0 0; padding: 10px 20px calc(24px + env(safe-area-inset-bottom)); box-shadow: var(--shadow-sheet); transform: translateY(100%); transition: transform 420ms var(--ease-drawer); visibility: hidden; }
+.menu-abierto .velo { opacity: 1; pointer-events: auto; }
+.menu-abierto .hoja-menu { transform: translateY(0); visibility: visible; }
+.hoja-menu .asa { width: 44px; height: 5px; border-radius: 999px; background: #C7D3DF; margin: 0 auto 14px; }
+.hoja-menu nav { display: grid; gap: 4px; }
+.hoja-menu nav a { display: flex; align-items: center; justify-content: space-between; min-height: 56px; padding: 0 16px; border-radius: 18px; color: var(--tinta); font-weight: 700; font-size: var(--text-md); text-decoration: none; }
+.hoja-menu nav a[aria-current="page"] { background: var(--celeste); color: var(--azul); }
+@media (prefers-reduced-motion: reduce) { .hoja-menu { transition: opacity 160ms ease, visibility 160ms; transform: none; opacity: 0; } .menu-abierto .hoja-menu { opacity: 1; } }
+
+/* ---------- Secciones ---------- */
+.seccion { padding-block: clamp(56px, 9vw, 112px); }
+.seccion.celeste { background: var(--celeste); }
+.seccion.arena { background: var(--arena-suave); }
+.titulo-seccion { font-size: clamp(2rem, 4.4vw, 3rem); max-width: 20ch; }
+.bajada { font-size: var(--text-md); color: var(--tinta-2); max-width: 58ch; margin-top: 14px; }
+.cifra-web { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.03em; color: var(--azul); }
+
+/* Héroe */
+.heroe { position: relative; padding-top: clamp(28px, 5vw, 56px); padding-bottom: clamp(40px, 7vw, 88px); overflow: hidden; }
+.heroe-grid { display: grid; gap: clamp(28px, 4vw, 56px); align-items: center; }
+@media (min-width: 900px) { .heroe-grid { grid-template-columns: 1.02fr 1fr; } }
+.heroe h1 { font-size: clamp(2.6rem, 6.6vw, 4.6rem); line-height: 1.02; letter-spacing: -0.035em; max-width: 13ch; }
+.heroe .bajada { font-size: clamp(1.1rem, 2vw, 1.3rem); }
+.acciones { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.ilustracion { position: relative; border-radius: 32px; overflow: hidden; box-shadow: var(--shadow-2); aspect-ratio: 4 / 3; background: #DCEEFC; }
+.ilustracion svg { width: 100%; height: 100%; }
+.etiqueta-ejemplo { position: absolute; left: 14px; bottom: 14px; display: inline-flex; gap: 6px; align-items: center; font-size: var(--text-xs); font-weight: 650; color: var(--tinta); background: rgba(255,255,255,0.88); border-radius: 999px; padding: 6px 12px; }
+
+/* Lista de lo que ofrece el club (filas, no tarjetas iguales) */
+.ofrece { display: grid; gap: 40px; }
+@media (min-width: 900px) { .ofrece { grid-template-columns: 0.8fr 1.2fr; align-items: start; } .ofrece > :first-child { position: sticky; top: 120px; } }
+.filas { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border-strong); }
+.filas li { display: grid; grid-template-columns: 56px 1fr; gap: 18px; padding: 24px 0; border-bottom: 1px solid var(--border-strong); align-items: start; }
+.filas .icono { width: 56px; height: 56px; border-radius: 18px; display: grid; place-items: center; background: #fff; color: var(--azul); box-shadow: var(--shadow-1); }
+.filas .icono.arena { background: var(--arena); color: var(--arena-tinta); }
+.filas .icono svg { width: 26px; height: 26px; }
+.filas h3 { font-size: var(--text-xl); color: var(--tinta); }
+.filas p { color: var(--tinta-2); margin-top: 6px; max-width: 60ch; }
+.filas .dato { display: inline-block; margin-top: 8px; font-weight: 650; color: var(--azul); }
+
+/* Tarjetas de contenido */
+.tarjeta { background: #fff; border-radius: 28px; padding: clamp(22px, 3vw, 32px); box-shadow: var(--shadow-1); border: 1px solid rgba(27,79,143,0.06); }
+.rejilla { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.pill { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 12px; border-radius: 999px; font-size: var(--text-sm); font-weight: 650; background: var(--celeste); color: var(--azul); }
+.pill.sol { background: var(--sol); color: var(--tinta); }
+.pill.arena { background: var(--arena); color: var(--arena-tinta); }
+.pill svg { width: 16px; height: 16px; }
+.dato-lista { display: grid; gap: 14px; margin: 0; }
+.dato-lista div { display: grid; grid-template-columns: 28px 1fr; gap: 12px; align-items: start; }
+.dato-lista svg { width: 24px; height: 24px; color: var(--azul); margin-top: 2px; }
+.dato-lista dt { font-weight: 700; }
+.dato-lista dd { margin: 2px 0 0; color: var(--tinta-2); }
+
+/* Avisos */
+.aviso-web { display: grid; gap: 10px; }
+.aviso-web img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 20px; }
+.aviso-web h3 { font-size: var(--text-xl); color: var(--tinta); }
+.esqueleto { background: #E6EEF6; border-radius: 12px; min-height: 18px; }
+
+/* Formulario */
+.campo { display: grid; gap: 8px; }
+.campo label { font-weight: 700; }
+.campo input, .campo select, .campo textarea { min-height: 56px; border-radius: 18px; border: 1.5px solid transparent; background: var(--celeste); padding: 0 16px; font-size: var(--text-md); color: var(--tinta); }
+.campo textarea { min-height: 110px; padding-top: 12px; resize: vertical; }
+.campo input:focus-visible, .campo select:focus-visible, .campo textarea:focus-visible { outline: none; border-color: var(--azul-activo); background: #fff; box-shadow: 0 0 0 4px rgba(42,107,192,.18); }
+.campo [aria-invalid="true"] { border-color: var(--peligro); }
+.campo .ayuda { font-size: var(--text-sm); color: var(--tinta-2); }
+.mensaje { padding: 16px; border-radius: 18px; font-weight: 600; }
+.mensaje.ok { background: var(--ok-suave); color: var(--ok-tinta); }
+.mensaje.error { background: var(--peligro-suave); color: var(--peligro-tinta); }
+.formulario { display: grid; gap: 18px; }
+@media (min-width: 700px) { .formulario .doble { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; } }
+
+/* Pie */
+.pie { background: var(--azul); color: #DCEBF8; padding-block: 56px 32px; }
+.pie a { color: #fff; }
+.pie .columnas { display: grid; gap: 32px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+.pie h2 { color: #fff; font-size: var(--text-lg); margin-bottom: 12px; }
+.pie .privado { margin-top: 40px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.18); display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; font-size: var(--text-sm); }
+.pie .privado b { color: #fff; }
+.pie .marca, .pie .marca b { color: #fff; }
+
+/* Aparición al hacer scroll (solo marketing; respeta movimiento reducido) */
+.revelar { opacity: 0; transform: translateY(14px); transition: opacity 600ms var(--ease-out), transform 600ms var(--ease-out); }
+.revelar.visible { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .revelar { opacity: 1; transform: none; transition: none; } }

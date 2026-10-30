@@ -1,0 +1,35 @@
+---
+import Icono from '../Icono.astro'
+import { fecha, type AvisoPublico } from '../../lib/datos'
+interface Props { avisos: AvisoPublico[] }
+const { avisos } = Astro.props
+const a = avisos[0]
+---
+<section class="seccion" aria-labelledby="aviso-t">
+  <div class="contenedor" style="display:grid;gap:28px">
+    <div class="revelar" style="display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-end">
+      <h2 id="aviso-t" class="titulo-seccion">Lo último del club</h2>
+      <a class="pill-btn secundario" href="/avisos">Todos los avisos</a>
+    </div>
+    <article class="tarjeta aviso-web revelar" data-ultimo-aviso aria-live="polite">
+      {a ? (
+        <>
+          <span class="pill">{a.fijado ? 'Fijado · ' : ''}{fecha(a.publicado_en)}</span>
+          <h3>{a.titulo}</h3>
+          <p style="white-space:pre-line">{a.texto}</p>
+        </>
+      ) : (
+        <>
+          <span class="pill"><Icono nombre="Megaphone" size={16} />Avisos</span>
+          <h3>Aquí aparecerán las noticias del club</h3>
+          <p>Torneos, horarios especiales y eventos que publica la directiva.</p>
+        </>
+      )}
+    </article>
+  </div>
+</section>
+<script>
+  import { traerAvisos, pintarAviso } from '../../lib/cliente'
+  const caja = document.querySelector<HTMLElement>('[data-ultimo-aviso]')
+  traerAvisos().then((l) => { if (caja && l?.length) caja.innerHTML = pintarAviso(l[0]) })
+</script>

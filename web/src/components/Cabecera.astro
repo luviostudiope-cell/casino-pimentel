@@ -1,0 +1,48 @@
+---
+import Ola from './Ola.astro'
+import Icono from './Icono.astro'
+const ruta = Astro.url.pathname.replace(/\/$/, '') || '/'
+const enlaces = [
+  { a: '/el-club', t: 'El club' },
+  { a: '/instalaciones', t: 'Instalaciones' },
+  { a: '/tenis', t: 'Tenis' },
+  { a: '/ambientes', t: 'Ambientes' },
+  { a: '/avisos', t: 'Avisos' },
+  { a: '/contacto', t: 'Contacto' },
+]
+---
+<a class="salto" href="#contenido">Ir al contenido</a>
+<header class="cabecera">
+  <div class="barra-nav">
+    <a class="marca" href="/" aria-label="Casino de Pimentel, inicio"><Ola /><b>Casino de Pimentel</b></a>
+    <nav class="nav-web" aria-label="Principal">
+      {enlaces.map((e) => <a href={e.a} aria-current={ruta === e.a ? 'page' : undefined}>{e.t}</a>)}
+    </nav>
+    <a class="pill-btn primario" href="/app/ingresar"><Icono nombre="IdCard" size={20} /><span>Soy socio</span></a>
+    <button type="button" class="btn-menu" aria-expanded="false" aria-controls="menu-movil" data-abrir-menu><Icono nombre="Menu" size={22} /><span>Menú</span></button>
+  </div>
+</header>
+<div class="velo" data-cerrar-menu></div>
+<div class="hoja-menu" id="menu-movil" role="dialog" aria-modal="true" aria-label="Menú" tabindex="-1">
+  <div class="asa" aria-hidden="true"></div>
+  <nav aria-label="Menú del celular">
+    <a href="/" aria-current={ruta === '/' ? 'page' : undefined}>Inicio <Icono nombre="ChevronRight" size={20} /></a>
+    {enlaces.map((e) => <a href={e.a} aria-current={ruta === e.a ? 'page' : undefined}>{e.t} <Icono nombre="ChevronRight" size={20} /></a>)}
+  </nav>
+  <div style="display:grid;gap:10px;margin-top:16px">
+    <a class="pill-btn primario" href="/app/ingresar">Soy socio</a>
+    <a class="pill-btn arena" href="/ambientes#consultar">Alquila un ambiente</a>
+    <button type="button" class="pill-btn secundario" data-cerrar-menu>Cerrar</button>
+  </div>
+</div>
+<script>
+  const raiz = document.documentElement
+  const boton = document.querySelector<HTMLButtonElement>('[data-abrir-menu]')
+  const hoja = document.getElementById('menu-movil')
+  let previo: HTMLElement | null = null
+  function abrir() { previo = document.activeElement as HTMLElement; raiz.classList.add('menu-abierto'); boton?.setAttribute('aria-expanded', 'true'); setTimeout(() => hoja?.focus(), 30) }
+  function cerrar() { raiz.classList.remove('menu-abierto'); boton?.setAttribute('aria-expanded', 'false'); previo?.focus() }
+  boton?.addEventListener('click', abrir)
+  document.querySelectorAll('[data-cerrar-menu]').forEach((el) => el.addEventListener('click', cerrar))
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && raiz.classList.contains('menu-abierto')) cerrar() })
+</script>

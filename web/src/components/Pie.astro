@@ -1,0 +1,33 @@
+---
+import Ola from './Ola.astro'
+import { CLUB } from '../lib/datos'
+---
+<footer class="pie">
+  <div class="contenedor">
+    <div class="columnas">
+      <div>
+        <a class="marca" href="/" aria-label="Casino de Pimentel, inicio"><Ola /><b>Casino de Pimentel</b></a>
+        <p style="margin-top:14px;max-width:34ch">Club social de socios frente al malecón de Pimentel.</p>
+      </div>
+      <div>
+        <h2>Visítanos</h2>
+        <p>{CLUB.direccion}</p>
+        <p style="margin-top:8px"><a href={CLUB.mapa} rel="noopener" target="_blank">Ver en Google Maps</a></p>
+      </div>
+      <div>
+        <h2>Llámanos</h2>
+        <p>Teléfono <a href="tel:074425244">{CLUB.telefono}</a></p>
+        <p>Celular <a href="tel:+51920349713">{CLUB.celular}</a></p>
+      </div>
+      <div>
+        <h2>Socios</h2>
+        <p><a href="/app/ingresar">Ingresar a la app del socio</a></p>
+        <p><a href="/ambientes#consultar">Consultar un ambiente</a></p>
+      </div>
+    </div>
+    <div class="privado">
+      <p><b>Club social privado.</b> El Casino de Pimentel es una asociación civil de socios: no es una casa de juegos de azar.</p>
+      <p>© {new Date().getFullYear()} Casino de Pimentel · <span>[Crédito del desarrollador por confirmar]</span></p>
+    </div>
+  </div>
+</footer>

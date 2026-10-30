@@ -1,0 +1,22 @@
+---
+import Base from '../layouts/Base.astro'
+import Icono from '../components/Icono.astro'
+---
+<Base titulo="El club" descripcion="El Casino de Pimentel es un club social tradicional de Pimentel, asociación civil de socios frente al malecón. Conoce su historia y cómo hacerte socio.">
+  <section class="seccion">
+    <div class="contenedor" style="display:grid;gap:28px;max-width:860px">
+      <span class="pill">El club</span>
+      <h1 class="titulo-seccion" style="font-size:clamp(2.4rem,5.4vw,3.6rem);max-width:18ch">Un club social tradicional de Pimentel</h1>
+      <p class="bajada" style="font-size:var(--text-lg)">El Casino de Pimentel es una asociación civil de socios y sus familias, frente al malecón. Su nombre viene de la tradición de los clubes sociales: no es una casa de juegos.</p>
+      <div class="tarjeta" style="display:grid;gap:14px">
+        <h2 style="font-size:var(--text-xl);color:var(--tinta)">Nuestra historia</h2>
+        <p>[Texto por confirmar con el club: año de fundación, socios fundadores, hitos del club y anécdotas del malecón.]</p>
+      </div>
+      <div class="tarjeta" style="display:grid;gap:14px">
+        <h2 style="font-size:var(--text-xl);color:var(--tinta)">¿Quieres ser socio?</h2>
+        <p>[Requisitos y proceso de admisión por confirmar con la directiva.] Mientras tanto, llámanos y te orientamos.</p>
+        <div class="acciones" style="margin-top:4px"><a class="pill-btn primario" href="tel:074425244"><Icono nombre="Phone" size={20} /><span>Llamar al 074-425244</span></a></div>
+      </div>
+    </div>
+  </section>
+</Base>

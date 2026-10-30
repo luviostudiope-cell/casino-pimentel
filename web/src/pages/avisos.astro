@@ -1,0 +1,30 @@
+---
+import Base from '../layouts/Base.astro'
+import { cargarDatos, fecha } from '../lib/datos'
+const d = await cargarDatos()
+---
+<Base titulo="Avisos" descripcion="Noticias del Casino de Pimentel: torneos, horarios especiales y eventos del club.">
+  <section class="seccion">
+    <div class="contenedor" style="display:grid;gap:28px;max-width:900px">
+      <div>
+        <span class="pill">Avisos</span>
+        <h1 class="titulo-seccion" style="margin-top:14px;font-size:clamp(2.4rem,5.4vw,3.6rem)">Noticias del club</h1>
+        <p class="bajada">Los socios reciben además los avisos internos en la app.</p>
+      </div>
+      <div style="display:grid;gap:20px" data-lista-avisos aria-live="polite">
+        {d.avisos.length ? d.avisos.map((a) => (
+          <article class="tarjeta aviso-web">
+            <span class="pill">{a.fijado ? 'Fijado · ' : ''}{fecha(a.publicado_en)}</span>
+            <h2 style="font-size:var(--text-xl);color:var(--tinta)">{a.titulo}</h2>
+            <p style="white-space:pre-line">{a.texto}</p>
+          </article>
+        )) : <article class="tarjeta aviso-web"><h2 style="font-size:var(--text-xl);color:var(--tinta)">Aún no hay avisos públicos</h2><p>Cuando la directiva publique una noticia para todos, aparecerá aquí.</p></article>}
+      </div>
+    </div>
+  </section>
+  <script>
+    import { traerAvisos, pintarAviso } from '../lib/cliente'
+    const caja = document.querySelector<HTMLElement>('[data-lista-avisos]')
+    traerAvisos().then((l) => { if (caja && l?.length) caja.innerHTML = l.map((a) => `<article class="tarjeta aviso-web">${pintarAviso(a).replace('<h3>', '<h2 style="font-size:var(--text-xl);color:var(--tinta)">').replace('</h3>', '</h2>')}</article>`).join('') })
+  </script>
+</Base>

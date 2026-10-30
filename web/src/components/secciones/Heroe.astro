@@ -1,0 +1,21 @@
+---
+import Ilustracion from '../Ilustracion.astro'
+import Icono from '../Icono.astro'
+---
+<section class="heroe" aria-labelledby="heroe-titulo">
+  <div class="contenedor heroe-grid">
+    <div>
+      <span class="pill">Club social de socios · Pimentel, Chiclayo</span>
+      <h1 id="heroe-titulo" style="margin-top:18px">Tu club frente al mar de Pimentel</h1>
+      <p class="bajada">Piscina, tenis, básquet, el bar El Astillero y ambientes para tus eventos, a pasos del muelle. Los socios entran con su carnet en el celular.</p>
+      <div class="acciones">
+        <a class="pill-btn primario" href="/app/ingresar"><Icono nombre="IdCard" size={20} /><span>Soy socio</span></a>
+        <a class="pill-btn arena" href="/ambientes#consultar"><Icono nombre="CalendarHeart" size={20} /><span>Alquila un ambiente</span></a>
+      </div>
+    </div>
+    <figure class="ilustracion" style="margin:0">
+      <Ilustracion />
+      <figcaption class="etiqueta-ejemplo">Imagen de ejemplo</figcaption>
+    </figure>
+  </div>
+</section>

@@ -1,0 +1,66 @@
+---
+import '../styles/web.css'
+import Cabecera from '../components/Cabecera.astro'
+import Pie from '../components/Pie.astro'
+import { CLUB } from '../lib/datos'
+
+interface Props { titulo: string; descripcion: string; imagen?: string }
+const { titulo, descripcion, imagen = '/og-casino-pimentel.png' } = Astro.props
+const sitio = Astro.site?.toString().replace(/\/$/, '') ?? ''
+const canonica = sitio + (Astro.url.pathname.replace(/\/$/, '') || '/')
+const tituloCompleto = titulo === CLUB.nombre ? `${CLUB.nombre} · Club social frente al mar en Pimentel, Chiclayo` : `${titulo} · ${CLUB.nombre}`
+
+// Datos estructurados: club social deportivo (solo datos confirmados; sin horarios ni reseñas sin verificar)
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': ['SportsClub', 'LocalBusiness'],
+      '@id': `${sitio}/#club`,
+      name: CLUB.nombre,
+      description: 'Club social privado de socios frente al malecón de Pimentel: piscina, tenis, básquet, bar El Astillero y ambientes para eventos.',
+      url: `${sitio}/`,
+      telephone: ['+51-74-425244', '+51-920349713'],
+      logo: `${sitio}/favicon.svg`,
+      image: `${sitio}${imagen}`,
+      address: { '@type': 'PostalAddress', streetAddress: CLUB.calle, addressLocality: 'Pimentel', addressRegion: 'Lambayeque', addressCountry: 'PE' },
+      hasMap: CLUB.mapa,
+      amenityFeature: ['Piscina', 'Canchas de tenis', 'Cancha de básquet', 'Bar El Astillero', 'Salón para eventos', 'Rincón parrillero'].map((n) => ({ '@type': 'LocationFeatureSpecification', name: n, value: true })),
+    },
+    { '@type': 'WebSite', '@id': `${sitio}/#web`, url: `${sitio}/`, name: CLUB.nombre, inLanguage: 'es-PE', publisher: { '@id': `${sitio}/#club` } },
+  ],
+}
+---
+<!doctype html>
+<html lang="es-PE">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{tituloCompleto}</title>
+    <meta name="description" content={descripcion} />
+    <link rel="canonical" href={canonica} />
+    <meta name="theme-color" content="#1B4F8F" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/app/icons/icon-192.png" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="es_PE" />
+    <meta property="og:site_name" content={CLUB.nombre} />
+    <meta property="og:title" content={tituloCompleto} />
+    <meta property="og:description" content={descripcion} />
+    <meta property="og:url" content={canonica} />
+    <meta property="og:image" content={sitio + imagen} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  </head>
+  <body>
+    <Cabecera />
+    <main id="contenido"><slot /></main>
+    <Pie />
+    <script>
+      // Aparición suave de secciones (solo transform y opacity; respeta movimiento reducido en CSS)
+      const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target) } }), { rootMargin: '0px 0px -10% 0px' })
+      document.querySelectorAll('.revelar').forEach((el) => io.observe(el))
+    </script>
+  </body>
+</html>

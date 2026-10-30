@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /app/
+
+Sitemap: https://casino-pimentel.netlify.app/sitemap-index.xml

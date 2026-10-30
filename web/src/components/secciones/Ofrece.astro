@@ -1,0 +1,21 @@
+---
+import Icono from '../Icono.astro'
+interface Props { horarios: { club: string; piscina: string; barra: string }; tenis: { hora_inicio: string; hora_fin: string } }
+const { horarios, tenis } = Astro.props
+---
+<section class="seccion celeste" aria-labelledby="ofrece-t">
+  <div class="contenedor ofrece">
+    <div class="revelar">
+      <h2 id="ofrece-t" class="titulo-seccion">Todo lo del club, en un mismo lugar</h2>
+      <p class="bajada">Un club de playa para la familia, frente al malecón.</p>
+      <a class="pill-btn secundario" href="/instalaciones" style="margin-top:24px">Ver instalaciones</a>
+    </div>
+    <ul class="filas revelar">
+      <li><span class="icono"><Icono nombre="Waves" /></span><div><h3>Piscina</h3><p>Para socios y sus familias; los invitados pagan su ingreso en portería.</p><span class="dato">{horarios.piscina}</span></div></li>
+      <li><span class="icono"><Icono nombre="Trophy" /></span><div><h3>Tenis</h3><p>Dos canchas que el socio reserva desde la app, por turnos de una hora.</p><span class="dato">De {tenis.hora_inicio} a {tenis.hora_fin}</span></div></li>
+      <li><span class="icono"><Icono nombre="Volleyball" /></span><div><h3>Básquet</h3><p>Una cancha de uso libre: no necesita reserva.</p></div></li>
+      <li><span class="icono arena"><Icono nombre="Anchor" /></span><div><h3>El Astillero</h3><p>El bar del club, con dos barras, tragos de autor como el "Bienvenido a Pimentel" y la carta de siempre.</p><span class="dato">{horarios.barra}</span></div></li>
+      <li><span class="icono"><Icono nombre="PartyPopper" /></span><div><h3>Ambientes para eventos</h3><p>Salón principal, rincón parrillero con jardín, deck y piscina en temporada baja.</p><a class="dato" href="/ambientes">Consultar disponibilidad</a></div></li>
+    </ul>
+  </div>
+</section>

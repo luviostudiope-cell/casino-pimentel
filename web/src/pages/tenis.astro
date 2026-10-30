@@ -1,0 +1,24 @@
+---
+import Base from '../layouts/Base.astro'
+import Icono from '../components/Icono.astro'
+import { cargarDatos } from '../lib/datos'
+const d = await cargarDatos()
+---
+<Base titulo="Tenis" descripcion="Dos canchas de tenis frente al mar en el Casino de Pimentel. Los socios reservan su turno de una hora desde la app, de 6:00 a 22:00.">
+  <section class="seccion">
+    <div class="contenedor rejilla" style="align-items:start">
+      <div style="display:grid;gap:18px">
+        <span class="pill">Tenis</span>
+        <h1 class="titulo-seccion" style="font-size:clamp(2.4rem,5.4vw,3.6rem)">Dos canchas, reservas desde el celular</h1>
+        <p class="bajada">Turnos de una hora, de {d.tenis.hora_inicio} a {d.tenis.hora_fin}. Reserva desde la app del socio: eliges el día, quién juega y la hora libre.</p>
+        <div class="acciones"><a class="pill-btn primario" href="/app/ingresar"><Icono nombre="CalendarCheck" size={20} /><span>Reserva desde la app del socio</span></a></div>
+      </div>
+      <dl class="tarjeta dato-lista">
+        <div><Icono nombre="Clock" /><div><dt>Horario</dt><dd>{d.tenis.hora_inicio} a {d.tenis.hora_fin}, turnos de 1 hora</dd></div></div>
+        <div><Icono nombre="Users" /><div><dt>Quién reserva</dt><dd>El titular, su esposa o esposo y los hijos menores de 25 años</dd></div></div>
+        <div><Icono nombre="CalendarDays" /><div><dt>Límites</dt><dd>1 reserva por persona al día y 3 por semana</dd></div></div>
+        <div><Icono nombre="Volleyball" /><div><dt>Básquet</dt><dd>La cancha de básquet es de uso libre, sin reserva</dd></div></div>
+      </dl>
+    </div>
+  </section>
+</Base>

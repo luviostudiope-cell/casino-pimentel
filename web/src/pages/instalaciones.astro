@@ -1,0 +1,31 @@
+---
+import Base from '../layouts/Base.astro'
+import Icono from '../components/Icono.astro'
+import { cargarDatos } from '../lib/datos'
+const d = await cargarDatos()
+const espacios = [
+  { icono: 'Waves', t: 'Piscina', p: 'Para socios y sus familias. Los invitados pagan su ingreso en portería.', h: d.horarios.piscina },
+  { icono: 'Trophy', t: 'Canchas de tenis', p: 'Dos canchas. El socio reserva desde la app su turno de una hora.', h: `${d.tenis.hora_inicio} a ${d.tenis.hora_fin}` },
+  { icono: 'Volleyball', t: 'Cancha de básquet', p: 'De uso libre para socios.', h: `${d.tenis.hora_inicio} a ${d.tenis.hora_fin}` },
+  { icono: 'Anchor', t: 'Bar El Astillero', p: 'Dos barras con tragos de autor, preparados, botellas y piqueos. Se paga en efectivo, Yape, tarjeta o a cuenta del socio.', h: d.horarios.barra },
+  { icono: 'PartyPopper', t: 'Salón principal', p: 'Para eventos grandes; se alquila completo, la mitad o un tercio.', h: 'Con reserva' },
+  { icono: 'Flame', t: 'Rincón parrillero y jardín', p: 'Parrilla al aire libre, con jardín para más invitados.', h: 'Con reserva' },
+  { icono: 'Sunset', t: 'Deck', p: 'Terraza frente al mar.', h: 'Con reserva' },
+] as const
+---
+<Base titulo="Instalaciones" descripcion="Piscina, dos canchas de tenis, básquet, el bar El Astillero, salón principal, rincón parrillero, jardín y deck frente al mar de Pimentel.">
+  <section class="seccion">
+    <div class="contenedor" style="display:grid;gap:32px">
+      <div>
+        <span class="pill">Instalaciones</span>
+        <h1 class="titulo-seccion" style="margin-top:14px;font-size:clamp(2.4rem,5.4vw,3.6rem)">Espacios para pasar el día en familia</h1>
+        <p class="bajada">Horarios marcados "[por confirmar]" se actualizan cuando el club los confirme.</p>
+      </div>
+      <ul class="filas" style="max-width:900px">
+        {espacios.map((e) => (
+          <li class="revelar"><span class={`icono ${e.icono === 'Anchor' ? 'arena' : ''}`}><Icono nombre={e.icono} /></span><div><h2 style="font-size:var(--text-xl);color:var(--tinta)">{e.t}</h2><p>{e.p}</p><span class="dato">{e.h}</span></div></li>
+        ))}
+      </ul>
+    </div>
+  </section>
+</Base>

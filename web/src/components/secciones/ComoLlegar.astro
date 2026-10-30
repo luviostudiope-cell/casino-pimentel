@@ -1,0 +1,23 @@
+---
+import Icono from '../Icono.astro'
+import { CLUB } from '../../lib/datos'
+interface Props { horarios: { club: string } }
+const { horarios } = Astro.props
+---
+<section class="seccion arena" aria-labelledby="llegar-t">
+  <div class="contenedor rejilla" style="align-items:center">
+    <div class="revelar">
+      <h2 id="llegar-t" class="titulo-seccion">Cómo llegar</h2>
+      <p class="bajada">Estamos frente al malecón de Pimentel.</p>
+      <div class="acciones">
+        <a class="pill-btn primario" href={CLUB.mapa} target="_blank" rel="noopener"><Icono nombre="MapPin" size={20} /><span>Abrir en Google Maps</span></a>
+        <a class="pill-btn secundario" href="tel:074425244"><Icono nombre="Phone" size={20} /><span>Llamar</span></a>
+      </div>
+    </div>
+    <dl class="tarjeta dato-lista revelar">
+      <div><Icono nombre="MapPin" /><div><dt>Dirección</dt><dd>{CLUB.direccion}</dd></div></div>
+      <div><Icono nombre="Clock" /><div><dt>Horario</dt><dd>{horarios.club}</dd></div></div>
+      <div><Icono nombre="Phone" /><div><dt>Teléfonos</dt><dd>{CLUB.telefono} · {CLUB.celular}</dd></div></div>
+    </dl>
+  </div>
+</section>

@@ -1,0 +1,8 @@
+---
+// Íconos de línea Lucide (siempre acompañados de texto visible).
+import * as iconos from 'lucide-static'
+interface Props { nombre: keyof typeof iconos; size?: number }
+const { nombre, size = 24 } = Astro.props
+const svg = String(iconos[nombre] ?? '').replace('<svg', `<svg aria-hidden="true" focusable="false" width="${size}" height="${size}"`)
+---
+<Fragment set:html={svg} />

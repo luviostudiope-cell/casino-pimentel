@@ -1,0 +1,81 @@
+---
+import Base from '../layouts/Base.astro'
+import Icono from '../components/Icono.astro'
+import { cargarDatos } from '../lib/datos'
+const d = await cargarDatos()
+const hoy = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10)
+---
+<Base titulo="Ambientes para eventos" descripcion="Alquila el salón principal, el rincón parrillero con jardín, el deck o la piscina del Casino de Pimentel para tu evento. Consulta disponibilidad y tarifas para socios y no socios.">
+  <section class="seccion">
+    <div class="contenedor" style="display:grid;gap:32px">
+      <div>
+        <span class="pill arena">Ambientes</span>
+        <h1 class="titulo-seccion" style="margin-top:14px;font-size:clamp(2.4rem,5.4vw,3.6rem)">Tu evento frente al mar</h1>
+        <p class="bajada">Se alquilan para matrimonios, cumpleaños, almuerzos y eventos de empresa. Traes a tus proveedores y te damos el día anterior para decorar.</p>
+      </div>
+      <div class="rejilla">
+        {d.ambientes.map((a) => (
+          <article class="tarjeta revelar" style="display:grid;gap:10px">
+            <h2 style="font-size:var(--text-xl);color:var(--tinta)">{a.nombre}</h2>
+            {a.descripcion && <p style="color:var(--tinta-2)">{a.descripcion}</p>}
+            <p class="pill" style="justify-self:start">Capacidad: {a.capacidad ?? '[por confirmar]'}</p>
+            {a.solo_temporada_baja && <p class="pill sol" style="justify-self:start">Solo temporada baja</p>}
+          </article>
+        ))}
+      </div>
+      <p class="tarjeta" style="display:flex;gap:12px;align-items:center"><Icono nombre="Tags" /><span><b>Consulta tarifas para socios y no socios.</b> Te las damos por teléfono según la fecha y el ambiente.</span></p>
+    </div>
+  </section>
+
+  <section class="seccion arena" id="consultar" aria-labelledby="consultar-t">
+    <div class="contenedor rejilla" style="align-items:start">
+      <div style="display:grid;gap:14px">
+        <h2 id="consultar-t" class="titulo-seccion">Consultar disponibilidad</h2>
+        <p class="bajada">Déjanos tus datos y la fecha. Administración te llama para confirmar disponibilidad y tarifa.</p>
+        <p style="color:var(--tinta-2)">¿Prefieres llamar? <a href="tel:074425244">074-425244</a> · <a href="tel:+51920349713">920 349 713</a></p>
+      </div>
+      <form class="tarjeta formulario" data-formulario novalidate>
+        <div class="campo"><label for="f-nombre">Nombre</label><input id="f-nombre" name="nombre" autocomplete="name" required /></div>
+        <div class="doble">
+          <div class="campo"><label for="f-celular">Celular</label><input id="f-celular" name="celular" inputmode="tel" autocomplete="tel" required /><span class="ayuda">Te llamamos a este número.</span></div>
+          <div class="campo"><label for="f-fecha">Fecha del evento</label><input id="f-fecha" name="fecha" type="date" min={hoy} required /></div>
+        </div>
+        <div class="campo"><label for="f-ambiente">Ambiente</label>
+          <select id="f-ambiente" name="ambiente">
+            <option value="">Aún no sé, quiero consultar</option>
+            {d.desdeBase && d.ambientes.map((a) => <option value={a.id}>{a.nombre}</option>)}
+          </select>
+        </div>
+        <div class="campo"><label for="f-tipo">Soy</label>
+          <select id="f-tipo" name="tipo" required>
+            <option value="no_socio">No socio</option><option value="socio">Socio del club</option><option value="institucion">Institución o empresa</option>
+          </select>
+        </div>
+        <div class="campo"><label for="f-mensaje">¿Qué evento es? (opcional)</label><textarea id="f-mensaje" name="mensaje" maxlength="1000"></textarea></div>
+        <div aria-live="polite" data-mensaje></div>
+        <button type="submit" class="pill-btn primario" style="width:100%">Enviar consulta</button>
+      </form>
+    </div>
+  </section>
+  <script>
+    import { solicitarAlquiler } from '../lib/cliente'
+    const f = document.querySelector<HTMLFormElement>('[data-formulario]')!
+    const caja = f.querySelector<HTMLElement>('[data-mensaje]')!
+    const boton = f.querySelector<HTMLButtonElement>('button[type="submit"]')!
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      f.querySelectorAll('[aria-invalid]').forEach((x) => x.removeAttribute('aria-invalid'))
+      const d = Object.fromEntries(new FormData(f)) as Record<string, string>
+      const marcar = (campo: string, texto: string) => { f.querySelector(`[name="${campo}"]`)?.setAttribute('aria-invalid', 'true'); caja.innerHTML = `<p class="mensaje error">${texto}</p>`; (f.querySelector(`[name="${campo}"]`) as HTMLElement | null)?.focus() }
+      if ((d.nombre ?? '').trim().length < 2) return marcar('nombre', 'Escribe tu nombre.')
+      if ((d.celular ?? '').replace(/\D/g, '').length < 9) return marcar('celular', 'Escribe un celular de 9 dígitos.')
+      if (!d.fecha) return marcar('fecha', 'Elige la fecha del evento.')
+      boton.disabled = true; boton.textContent = 'Enviando…'
+      const r = await solicitarAlquiler(d)
+      boton.disabled = false; boton.textContent = 'Enviar consulta'
+      if (r.ok) { caja.innerHTML = `<p class="mensaje ok">${r.mensaje}</p>`; f.reset() }
+      else if (r.campo) marcar(r.campo === 'tipo_cliente' ? 'tipo' : r.campo, r.mensaje)
+      else caja.innerHTML = `<p class="mensaje error">${r.mensaje}</p>`
+    })
+  </script>
+</Base>

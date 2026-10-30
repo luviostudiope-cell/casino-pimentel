@@ -1,16 +1,15 @@
 ---
+import Base from '../layouts/Base.astro'
+import Heroe from '../components/secciones/Heroe.astro'
+import Ofrece from '../components/secciones/Ofrece.astro'
+import UltimoAviso from '../components/secciones/UltimoAviso.astro'
+import ComoLlegar from '../components/secciones/ComoLlegar.astro'
+import { cargarDatos } from '../lib/datos'
+const d = await cargarDatos()
 ---
-
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<Base titulo="Casino de Pimentel" descripcion="Club social de socios frente al malecón de Pimentel, Chiclayo: piscina, tenis, básquet, el bar El Astillero y ambientes para eventos. Socios: carnet y reservas desde el celular.">
+  <Heroe />
+  <Ofrece horarios={d.horarios} tenis={d.tenis} />
+  <UltimoAviso avisos={d.avisos} />
+  <ComoLlegar horarios={d.horarios} />
+</Base>
