@@ -8,5 +8,8 @@
     "dev:app": "npm --prefix app run dev",
     "dev:web": "npm --prefix web run dev",
     "servir": "npx serve dist -l 8888 -c ../serve.json"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.13"
   }
 }

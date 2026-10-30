@@ -34,3 +34,27 @@ Registro paso a paso de la construcción del sistema, para el caso de éxito. Ho
 
 **Cifras**
 - 13 colores con su contraste medido · 20 componentes · 1 vitrina.
+
+---
+
+## PASO 3 · Base de datos — 30-oct-2026, 09:00 a 11:30
+
+**Qué se construyó**
+- 10 migraciones versionadas en `supabase/migrations`: 47 tablas, todas con `club_id` (el sistema sirve para varios clubes) y con las reglas del club en `config.reglas` (JSON validado por una función: invitados, tenis, cuotas, tolerancia de tardanza, hora del reporte, regla de morosos, vigencia del QR, IGV de alquileres).
+- Seguridad en todas las tablas (RLS): el socio solo ve lo suyo y lo de su familia; barra y portería solo lo que operan; la directiva ve todo; solo administración edita la configuración. **Nadie borra**: no existe ninguna política de borrado y se quitó el permiso; todo es borrado lógico con motivo.
+- Registro total: un trigger genérico guarda en `auditoria` cada alta y cambio de todas las tablas (antes, después, qué campos cambiaron, quién y cuándo), y `accesos` guarda inicios y cierres de sesión.
+- 34 funciones con la lógica crítica: carnet con QR firmado (HMAC-SHA256) que vence a los 30 segundos, validar e ingresar en portería, invitados (5 por día y 3 visitas al mes por DNI), tenis (1 por día, 3 por semana, hijos menores de 25, sin doble reserva), comandas y cobro con descuento de stock por receta en onzas, cortesías con PIN del encargado, cierre de barra (esperado vs contado y conteo físico), kardex, cuotas, validación de pagos aplicada a la cuota más antigua, asistencia con tardanzas, alquileres con tarifa automática, IGV y día de decoración, panel "Hoy", reporte diario, importador del padrón y la web pública.
+- Tareas automáticas (pg_cron): cuotas el día 1, cuotas vencidas cada día, reporte diario a la hora de config (22:30 Lima por defecto) y aviso de faltas del personal.
+- Seed: carta real de El Astillero (55 productos), los 75 insumos reales del Excel del club con su unidad, proveedores, tarifas de ambientes; y datos de ejemplo marcados: 60 socios ficticios con 190 miembros de familia, 15 trabajadores con turnos, 318 comandas y 1,200 ingresos de octubre.
+
+**Decisiones**
+- Las cuotas vencen el día 10 del mes siguiente (configurable): así el socio ve "por vencer" antes de caer en deuda. Queda por confirmar con el club.
+- Los licores se controlan en onzas (750 ml = 25.4 oz; 700 ml = 23.67 oz) y se muestran como "botellas + onzas", igual que el kardex en papel.
+- Los PIN del personal están en un esquema privado con bcrypt: ni administración puede leerlos.
+
+**Problemas y soluciones**
+- El proyecto de Supabase no se pudo crear desde aquí (falta confirmar el costo). Para no detenerse, se montó una réplica local de Supabase con PGlite (Postgres en WebAssembly) y se probaron ahí todas las migraciones, el seed y las reglas.
+- En el seed, un sorteo aleatorio dentro de un `WHERE` se recalculaba por fila y dejaba comandas sin producto; se fijó el sorteo en una variable antes de la consulta.
+
+**Cifras**
+- 47 tablas · 34 funciones · 4 tareas programadas · **38 de 38 pruebas de seguridad y reglas superadas** (casos que deben pasar y que deben fallar).
