@@ -429,3 +429,6 @@ button.list-item:active, a.list-item:active { transform: scale(0.99); background
 .aparecer { animation: aparecer var(--dur-slow) var(--ease-out) both; }
 @keyframes aparecer { from { opacity: 0; transform: translateY(8px); } }
 @media (prefers-reduced-motion: reduce) { .aparecer { animation: aparecer-suave var(--dur-base) ease both; } @keyframes aparecer-suave { from { opacity: 0; } } }
+
+@keyframes crecer { from { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { [style*="crecer"] { animation: none !important; } }

@@ -27,7 +27,8 @@ Deno.serve(async (req) => {
   const usuario = createClient(URL, ANON, { global: { headers: { Authorization: jwt } }, auth: { persistSession: false } })
   const { data: perfil } = await usuario.rpc('mi_perfil')
   if (!perfil || !['presidente', 'directivo', 'admin'].includes(perfil.rol)) return json({ error: 'Solo la directiva gestiona cuentas.' }, 403)
-  const { accion, socio_id, socio_ids } = (await req.json().catch(() => ({}))) as { accion?: string; socio_id?: string; socio_ids?: string[] }
+  const cuerpo = (await req.json().catch(() => ({}))) as Record<string, unknown>
+  const { accion, socio_id, socio_ids } = cuerpo as { accion?: string; socio_id?: string; socio_ids?: string[] }
   const admin = createClient(URL, SERVICIO, { auth: { persistSession: false } })
   const { data: club } = await admin.from('clubes').select('id, slug').eq('id', perfil.club_id).single()
 
@@ -65,6 +66,15 @@ Deno.serve(async (req) => {
     const resultados = []
     for (const id of ids.slice(0, 300)) resultados.push(await asegurarCuenta(id))
     return json({ ok: true, cuentas: resultados })
+  }
+  if (accion === 'crear_staff') {
+    if (perfil.rol !== 'admin') return json({ error: 'Solo administración crea usuarios.' }, 403)
+    const { correo, nombre, rol, clave } = cuerpo as { correo?: string; nombre?: string; rol?: string; clave?: string }
+    if (!correo?.includes('@') || !nombre || !['presidente', 'directivo', 'admin', 'barra', 'porteria'].includes(rol ?? '') || (clave ?? '').length < 8) return json({ error: 'Completa correo, nombre, rol y una clave de al menos 8 caracteres.' }, 400)
+    const { data: nuevo, error } = await admin.auth.admin.createUser({ email: correo.toLowerCase(), password: clave, email_confirm: true })
+    if (error || !nuevo.user) return json({ error: 'No se pudo crear: ' + (error?.message ?? '') }, 400)
+    await admin.from('usuarios_staff').insert({ id: nuevo.user.id, club_id: club!.id, nombre, correo: correo.toLowerCase(), rol })
+    return json({ ok: true })
   }
   return json({ error: 'Acción no reconocida.' }, 400)
 })
