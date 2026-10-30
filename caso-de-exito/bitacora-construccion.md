@@ -40,10 +40,10 @@ Registro paso a paso de la construcción del sistema, para el caso de éxito. Ho
 ## PASO 3 · Base de datos — 30-oct-2026, 09:00 a 11:30
 
 **Qué se construyó**
-- 10 migraciones versionadas en `supabase/migrations`: 47 tablas, todas con `club_id` (el sistema sirve para varios clubes) y con las reglas del club en `config.reglas` (JSON validado por una función: invitados, tenis, cuotas, tolerancia de tardanza, hora del reporte, regla de morosos, vigencia del QR, IGV de alquileres).
+- 10 migraciones versionadas en `supabase/migrations`: 46 tablas (más 5 internas en un esquema privado), todas con `club_id` (el sistema sirve para varios clubes) y con las reglas del club en `config.reglas` (JSON validado por una función: invitados, tenis, cuotas, tolerancia de tardanza, hora del reporte, regla de morosos, vigencia del QR, IGV de alquileres).
 - Seguridad en todas las tablas (RLS): el socio solo ve lo suyo y lo de su familia; barra y portería solo lo que operan; la directiva ve todo; solo administración edita la configuración. **Nadie borra**: no existe ninguna política de borrado y se quitó el permiso; todo es borrado lógico con motivo.
 - Registro total: un trigger genérico guarda en `auditoria` cada alta y cambio de todas las tablas (antes, después, qué campos cambiaron, quién y cuándo), y `accesos` guarda inicios y cierres de sesión.
-- 34 funciones con la lógica crítica: carnet con QR firmado (HMAC-SHA256) que vence a los 30 segundos, validar e ingresar en portería, invitados (5 por día y 3 visitas al mes por DNI), tenis (1 por día, 3 por semana, hijos menores de 25, sin doble reserva), comandas y cobro con descuento de stock por receta en onzas, cortesías con PIN del encargado, cierre de barra (esperado vs contado y conteo físico), kardex, cuotas, validación de pagos aplicada a la cuota más antigua, asistencia con tardanzas, alquileres con tarifa automática, IGV y día de decoración, panel "Hoy", reporte diario, importador del padrón y la web pública.
+- 38 funciones (RPC) con la lógica crítica: carnet con QR firmado (HMAC-SHA256) que vence a los 30 segundos, validar e ingresar en portería, invitados (5 por día y 3 visitas al mes por DNI), tenis (1 por día, 3 por semana, hijos menores de 25, sin doble reserva), comandas y cobro con descuento de stock por receta en onzas, cortesías con PIN del encargado, cierre de barra (esperado vs contado y conteo físico), kardex, cuotas, validación de pagos aplicada a la cuota más antigua, asistencia con tardanzas, alquileres con tarifa automática, IGV y día de decoración, panel "Hoy", reporte diario, importador del padrón y la web pública.
 - Tareas automáticas (pg_cron): cuotas el día 1, cuotas vencidas cada día, reporte diario a la hora de config (22:30 Lima por defecto) y aviso de faltas del personal.
 - Seed: carta real de El Astillero (55 productos), los 75 insumos reales del Excel del club con su unidad, proveedores, tarifas de ambientes; y datos de ejemplo marcados: 60 socios ficticios con 190 miembros de familia, 15 trabajadores con turnos, 318 comandas y 1,200 ingresos de octubre.
 
@@ -57,4 +57,4 @@ Registro paso a paso de la construcción del sistema, para el caso de éxito. Ho
 - En el seed, un sorteo aleatorio dentro de un `WHERE` se recalculaba por fila y dejaba comandas sin producto; se fijó el sorteo en una variable antes de la consulta.
 
 **Cifras**
-- 47 tablas · 34 funciones · 4 tareas programadas · **38 de 38 pruebas de seguridad y reglas superadas** (casos que deben pasar y que deben fallar).
+- 46 tablas · 38 funciones RPC · 101 políticas de seguridad · 50 triggers · 4 tareas programadas · **38 de 38 pruebas de seguridad y reglas superadas** (casos que deben pasar y que deben fallar).
