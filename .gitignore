@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.astro/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.netlify/
+supabase/.temp/
+supabase/.branches/
+# Material del cliente con datos privados: nunca al repositorio
+caso-de-exito/antes/*PRIVADO*
+casino-pimentel-kit.zip
+assets-cliente/
+test-results/
+playwright-report/
+.claude/settings.local.json

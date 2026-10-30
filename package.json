@@ -1,0 +1,12 @@
+{
+  "name": "casino-pimentel",
+  "private": true,
+  "description": "Plataforma del Casino de Pimentel: web pública, panel, barra, portería y app del socio sobre Supabase.",
+  "scripts": {
+    "instalar": "npm --prefix web install && npm --prefix app install",
+    "build": "node scripts/construir.mjs",
+    "dev:app": "npm --prefix app run dev",
+    "dev:web": "npm --prefix web run dev",
+    "servir": "npx serve dist -l 8888 -c ../serve.json"
+  }
+}
