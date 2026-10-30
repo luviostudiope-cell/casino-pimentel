@@ -58,3 +58,40 @@ Registro paso a paso de la construcción del sistema, para el caso de éxito. Ho
 
 **Cifras**
 - 46 tablas · 38 funciones RPC · 101 políticas de seguridad · 50 triggers · 4 tareas programadas · **38 de 38 pruebas de seguridad y reglas superadas** (casos que deben pasar y que deben fallar).
+
+---
+
+## PASO 4 a 7 · Panel, barra, portería y app del socio — 30-oct-2026, 11:30 a 14:30
+
+**Qué se construyó**
+- **Ingreso único** (`/app/ingresar`): el socio entra con su DNI y un PIN de 6 números en un teclado grande; el personal, con correo y clave. Tras 5 intentos fallidos el ingreso se pausa 15 minutos. El primer ingreso obliga a crear un PIN propio.
+- **App del socio**: inicio con su estado de cuenta, **carnet digital** (tarjeta cielo-mar que se voltea con un resorte y abre el QR a pantalla completa con un anillo que cuenta los 30 segundos hasta que el código se renueva), cuenta con cuotas mes a mes, consumos a cuenta en El Astillero con detalle y pago por Yape con constancia, reservas de tenis que explican por qué no se puede, invitados con cupos del día y del mes, ambientes, avisos, perfil y una bienvenida de 3 pasos.
+- **Portería**: dos botones enormes (escanear carnet / buscar socio), tarjeta grande con foto, estado y familia, ticket digital en lugar del talonario, invitados con las reglas aplicadas por el sistema, lista "Dentro del club hoy" y **modo asistencia** tipo kiosco (DNI o PIN, foto automática, "Llegaste 12 min tarde").
+- **Barra El Astillero**: inicio de turno, venta en pills grandes por categoría, cobro en 4 toques con vuelto, cortesías con motivo y PIN del encargado, mesas abiertas, comandas del día y **cierre del día** con conteo rápido de botellas y onzas y la diferencia resaltada.
+- **Panel**: "Hoy" con frase del día y contadores, "Requiere tu atención", socios (ficha, familia, cuotas, cuenta, constancias, nuevo PIN), importador del padrón desde Excel, cobranza, barra (kardex, cierres, carta con modo evento, insumos y recetas, compras, cortesías), caja de oficina con cierre cada dos días, portería, personal (asistencia con foto, turnos, fichas, reporte mensual de planilla y recibo), tenis, ambientes con tarifa automática, avisos, reportes, registro y configuración.
+- **Edge Functions**: ingreso del socio, cambio de PIN, cuentas de socios y del personal, envío de notificaciones push y **reporte diario** (redactado por Claude con el modelo claude-haiku-5-5 o con una plantilla, enviado por Telegram y como notificación).
+
+**Decisiones**
+- Cada pantalla abre con una línea que explica para qué sirve.
+- El socio con deuda **entra igual** y se avisa a administración; la regla de bloquear queda en la configuración para que el club decida.
+- La comanda nunca se borra: si se edita una mesa abierta, las líneas anteriores quedan "anuladas" y se registran las nuevas.
+
+## PASO 7B · Web pública — 30-oct-2026, 14:30 a 15:00
+
+- 8 páginas en Astro (inicio, el club, instalaciones, tenis, ambientes con formulario de consulta, avisos en vivo, contacto, 404), cada sección en su propio componente para rediseñarla después.
+- Ilustración de ejemplo del malecón con el muelle y caballitos de totora, sin personas ni fotos de banco, marcada "Imagen de ejemplo".
+- Pie con la aclaración "Club social privado: no es una casa de juegos de azar" (la gente lo confunde en Google).
+- SEO base: título y descripción por página, datos estructurados SportsClub/LocalBusiness solo con datos confirmados, Open Graph, sitemap y robots.
+
+**Problemas y soluciones**
+- En celular, el botón "Menú" quedaba fuera de la pantalla: en anchos pequeños el botón "Soy socio" de la cabecera se oculta (sigue en el héroe y en el menú).
+- En "Cómo llegar" las etiquetas se montaban sobre los datos: una regla de cuadrícula se aplicaba también al bloque interno; se limitó a los hijos directos.
+
+## PASO 10 (parcial) · Publicación — 30-oct-2026, 15:00
+
+- Código en el repositorio privado de GitHub `casino-pimentel` (revisado: sin claves ni archivos PRIVADO).
+- Publicado en https://casino-pimentel.netlify.app (web completa; la app espera la conexión con la base).
+- Problema: el despliegue del repositorio completo superaba el límite de subida de Netlify; se publicó la carpeta ya construida con el CLI.
+
+**Cifras a esta hora**
+- 4 módulos + web · 13 secciones del panel · 5 Edge Functions · 18 capturas del después (web y sistema de diseño en 3 tamaños).

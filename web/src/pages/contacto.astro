@@ -17,11 +17,11 @@ const d = await cargarDatos()
         </div>
       </div>
       <dl class="tarjeta dato-lista">
-        <div><Icono nombre="MapPin" /><div><dt>Dirección</dt><dd>{CLUB.direccion}</dd></div></div>
-        <div><Icono nombre="Phone" /><div><dt>Teléfono</dt><dd><a href="tel:074425244">{CLUB.telefono}</a></dd></div></div>
-        <div><Icono nombre="Smartphone" /><div><dt>Celular</dt><dd><a href="tel:+51920349713">{CLUB.celular}</a></dd></div></div>
-        <div><Icono nombre="MessageCircle" /><div><dt>WhatsApp</dt><dd>{CLUB.whatsapp}</dd></div></div>
-        <div><Icono nombre="Clock" /><div><dt>Horario</dt><dd>{d.horarios.club}</dd></div></div>
+        <div><dt><Icono nombre="MapPin" /><span>Dirección</span></dt><dd>{CLUB.direccion}</dd></div>
+        <div><dt><Icono nombre="Phone" /><span>Teléfono</span></dt><dd><a href="tel:074425244">{CLUB.telefono}</a></dd></div>
+        <div><dt><Icono nombre="Smartphone" /><span>Celular</span></dt><dd><a href="tel:+51920349713">{CLUB.celular}</a></dd></div>
+        <div><dt><Icono nombre="MessageCircle" /><span>WhatsApp</span></dt><dd>{CLUB.whatsapp}</dd></div>
+        <div><dt><Icono nombre="Clock" /><span>Horario</span></dt><dd>{d.horarios.club}</dd></div>
       </dl>
     </div>
   </section>

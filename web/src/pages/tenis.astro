@@ -14,10 +14,10 @@ const d = await cargarDatos()
         <div class="acciones"><a class="pill-btn primario" href="/app/ingresar"><Icono nombre="CalendarCheck" size={20} /><span>Reserva desde la app del socio</span></a></div>
       </div>
       <dl class="tarjeta dato-lista">
-        <div><Icono nombre="Clock" /><div><dt>Horario</dt><dd>{d.tenis.hora_inicio} a {d.tenis.hora_fin}, turnos de 1 hora</dd></div></div>
-        <div><Icono nombre="Users" /><div><dt>Quién reserva</dt><dd>El titular, su esposa o esposo y los hijos menores de 25 años</dd></div></div>
-        <div><Icono nombre="CalendarDays" /><div><dt>Límites</dt><dd>1 reserva por persona al día y 3 por semana</dd></div></div>
-        <div><Icono nombre="Volleyball" /><div><dt>Básquet</dt><dd>La cancha de básquet es de uso libre, sin reserva</dd></div></div>
+        <div><dt><Icono nombre="Clock" /><span>Horario</span></dt><dd>{d.tenis.hora_inicio} a {d.tenis.hora_fin}, turnos de 1 hora</dd></div>
+        <div><dt><Icono nombre="Users" /><span>Quién reserva</span></dt><dd>El titular, su esposa o esposo y los hijos menores de 25 años</dd></div>
+        <div><dt><Icono nombre="CalendarDays" /><span>Límites</span></dt><dd>1 reserva por persona al día y 3 por semana</dd></div>
+        <div><dt><Icono nombre="Volleyball" /><span>Básquet</span></dt><dd>La cancha de básquet es de uso libre, sin reserva</dd></div>
       </dl>
     </div>
   </section>

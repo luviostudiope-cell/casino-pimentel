@@ -87,7 +87,11 @@ body { font-size: var(--text-base); }
 .pill.arena { background: var(--arena); color: var(--arena-tinta); }
 .pill svg { width: 16px; height: 16px; }
 .dato-lista { display: grid; gap: 14px; margin: 0; }
-.dato-lista > div { display: grid; grid-template-columns: 28px 1fr; gap: 12px; align-items: start; }
+.dato-lista > div { display: grid; grid-template-columns: 28px 1fr; column-gap: 12px; align-items: start; }
+.dato-lista dt { display: contents; }
+.dato-lista dt svg { grid-row: span 2; }
+.dato-lista dt span { font-weight: 700; }
+.dato-lista dd { grid-column: 2; }
 .dato-lista svg { width: 24px; height: 24px; color: var(--azul); margin-top: 2px; }
 .dato-lista dt { font-weight: 700; }
 .dato-lista dd { margin: 2px 0 0; color: var(--tinta-2); }
