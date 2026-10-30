@@ -172,7 +172,7 @@ export default function Venta() {
           {productos.map((p) => {
             const n = enCarrito(p.id)
             return (
-              <motion.button key={p.id} type="button" role="listitem" className="prod" onClick={() => agregar(p)} whileTap={reducir ? undefined : { scale: 0.96 }} transition={{ duration: 0.12 }}
+              <motion.button key={p.id} type="button" role="listitem" className="prod" onClick={() => agregar(p)} whileTap={reducir ? undefined : { transform: 'scale(0.96)' }} transition={{ duration: 0.12 }}
                 aria-label={`${p.nombre}, ${monedaCorta(precio(p))}${n ? `, ${n} en la comanda` : ''}`}>
                 {n > 0 && <span className="badge prod-badge">{n}</span>}
                 <span className="prod-nombre">{p.nombre}</span>

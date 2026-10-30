@@ -198,9 +198,11 @@ export function Carnet({ datos, obtenerToken, vigencia = 30 }: {
       <div className="carnet-escena">
         <motion.button type="button" className="carnet" onClick={() => (volteado ? cerrar() : abrir())}
           aria-label={volteado ? 'Ocultar el QR del carnet' : `Carnet de ${datos.nombre}. Toca para mostrar el QR de ingreso`}
-          animate={reducir ? { opacity: 1 } : { rotateY: volteado ? 180 : 0 }}
+          initial={false}
+          style={{ transform: 'rotateY(0deg)' }}
+          animate={reducir ? { opacity: 1 } : { transform: volteado ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
           transition={{ type: 'spring', bounce: 0.18, duration: 0.6 }}
-          whileTap={reducir ? undefined : { scale: 0.98 }}>
+          >
           <div className="carnet-cara carnet-frente">
             <OlasDecor />
             <div className="carnet-top">
