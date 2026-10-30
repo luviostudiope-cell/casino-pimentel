@@ -10,6 +10,7 @@
     "servir": "npx serve dist -l 8888 -c ../serve.json"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.13"
+    "@electric-sql/pglite": "^0.5.13",
+    "@playwright/test": "^1.56.1"
   }
 }

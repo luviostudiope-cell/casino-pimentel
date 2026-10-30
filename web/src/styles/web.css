@@ -87,13 +87,14 @@ body { font-size: var(--text-base); }
 .pill.arena { background: var(--arena); color: var(--arena-tinta); }
 .pill svg { width: 16px; height: 16px; }
 .dato-lista { display: grid; gap: 14px; margin: 0; }
-.dato-lista div { display: grid; grid-template-columns: 28px 1fr; gap: 12px; align-items: start; }
+.dato-lista > div { display: grid; grid-template-columns: 28px 1fr; gap: 12px; align-items: start; }
 .dato-lista svg { width: 24px; height: 24px; color: var(--azul); margin-top: 2px; }
 .dato-lista dt { font-weight: 700; }
 .dato-lista dd { margin: 2px 0 0; color: var(--tinta-2); }
 
 /* Avisos */
 .aviso-web { display: grid; gap: 10px; }
+.aviso-web .pill { justify-self: start; }
 .aviso-web img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 20px; }
 .aviso-web h3 { font-size: var(--text-xl); color: var(--tinta); }
 .esqueleto { background: #E6EEF6; border-radius: 12px; min-height: 18px; }
@@ -125,3 +126,4 @@ body { font-size: var(--text-base); }
 .revelar { opacity: 0; transform: translateY(14px); transition: opacity 600ms var(--ease-out), transform 600ms var(--ease-out); }
 .revelar.visible { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) { .revelar { opacity: 1; transform: none; transition: none; } }
+.tarjeta > svg, p.tarjeta svg { flex: none; }

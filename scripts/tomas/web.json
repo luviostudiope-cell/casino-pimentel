@@ -1,0 +1,8 @@
+[
+  { "nombre": "01-web-inicio", "ruta": "/", "completa": true },
+  { "nombre": "02-web-instalaciones", "ruta": "/instalaciones", "completa": true },
+  { "nombre": "03-web-tenis", "ruta": "/tenis", "completa": true },
+  { "nombre": "04-web-ambientes-y-consulta", "ruta": "/ambientes", "completa": true },
+  { "nombre": "05-web-contacto", "ruta": "/contacto", "completa": true },
+  { "nombre": "06-sistema-de-diseno", "ruta": "/app/sistema", "completa": true, "espera": 1500 }
+]
