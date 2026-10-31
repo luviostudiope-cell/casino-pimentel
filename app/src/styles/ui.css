@@ -200,7 +200,9 @@
 .switch[aria-checked="true"]::after { transform: translateX(22px); }
 
 /* ---------- Teclado numérico grande (PIN y montos) ---------- */
-.numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-3); width: 100%; max-width: 420px; margin-inline: auto; }
+.numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-3); width: 100%; max-width: 420px; margin-inline: auto; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+/* Al tocar rápido, que no se seleccione el texto de chips, pestañas ni botones */
+.chip, .tab, .tabbar a, .tabbar button, .icon-btn, .prod { user-select: none; -webkit-user-select: none; touch-action: manipulation; }
 .numpad-key {
   min-height: 76px; border-radius: var(--r-md); border: 0;
   background: var(--surface); box-shadow: var(--shadow-1);

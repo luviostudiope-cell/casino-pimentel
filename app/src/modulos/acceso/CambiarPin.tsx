@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { ShieldCheck } from 'lucide-react'
 import { Aviso, PuntosPin, TecladoNumerico, Wordmark, useToast } from '../../ui'
@@ -30,24 +30,23 @@ export default function CambiarPin({ alTerminar }: { alTerminar?: () => void }) 
 
   const tecla = useCallback((d: string) => {
     setError(null)
-    setPin((p) => {
-      if (p.length >= 6) return p
-      const n = p + d
-      if (n.length === 6) {
-        window.setTimeout(() => {
-          if (!primero) {
-            if (/^(\d)\1{5}$/.test(n) || '0123456789'.includes(n) || '9876543210'.includes(n)) {
-              setError('Ese PIN es muy fácil de adivinar. Elige otro.'); setPin(''); return
-            }
-            setPrimero(n); setPin('')
-          } else if (n !== primero) {
-            setError('Los PIN no coinciden. Empecemos otra vez.'); setPrimero(null); setPin('')
-          } else guardar(n)
-        }, 140)
-      }
-      return n
-    })
-  }, [primero, guardar])
+    setPin((p) => (p.length >= 6 ? p : p + d))
+  }, [])
+  // Al completar 6 números: primera vez se guarda, segunda vez se confirma (fuera del actualizador de estado)
+  useEffect(() => {
+    if (pin.length !== 6) return
+    const t = window.setTimeout(() => {
+      if (!primero) {
+        if (/^(\d)\1{5}$/.test(pin) || '0123456789'.includes(pin) || '9876543210'.includes(pin)) {
+          setError('Ese PIN es muy fácil de adivinar. Elige otro.'); setPin(''); return
+        }
+        setPrimero(pin); setPin('')
+      } else if (pin !== primero) {
+        setError('Los PIN no coinciden. Empecemos otra vez.'); setPrimero(null); setPin('')
+      } else guardar(pin)
+    }, 140)
+    return () => clearTimeout(t)
+  }, [pin, primero, guardar])
 
   if (!sesion || !perfil) return <Navigate to="/ingresar" replace />
   if (perfil.tipo !== 'socio') return <Navigate to="/" replace />

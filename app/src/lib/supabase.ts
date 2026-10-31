@@ -33,7 +33,7 @@ export async function funcion<T = unknown>(nombre: string, body?: unknown): Prom
 
 export function traducirError(m: string): string {
   if (/Invalid login credentials/i.test(m)) return 'El correo o la clave no coinciden. Revísalos e intenta otra vez.'
-  if (/Failed to fetch|NetworkError|network/i.test(m)) return 'No hay conexión con el servidor. Revisa el internet e intenta de nuevo.'
+  if (/Failed to fetch|Failed to send a request|NetworkError|network/i.test(m)) return 'No hay conexión con el servidor. Revisa el internet e intenta de nuevo.'
   if (/JWT expired/i.test(m)) return 'Tu sesión venció. Vuelve a ingresar.'
   if (/permission denied|row-level security/i.test(m)) return 'No tienes permiso para hacer esto. Pide ayuda a administración.'
   return m.replace(/^.*?ERROR:\s*/i, '')

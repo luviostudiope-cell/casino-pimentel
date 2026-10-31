@@ -8,6 +8,7 @@ import { inicioDeRol } from '../../lib/roles'
 
 type Modo = 'socio' | 'personal'
 const EASE = [0.23, 1, 0.32, 1] as const
+const AVISO_SIN_BASE = 'Todavía no se puede entrar: la base de datos del club aún no está conectada.'
 
 export default function Ingresar({ sinBase = false }: { sinBase?: boolean }) {
   const { sesion, perfil, ingresarSocio, ingresarStaff } = useSesion()
@@ -29,6 +30,7 @@ export default function Ingresar({ sinBase = false }: { sinBase?: boolean }) {
   }, [sesion, perfil, navegar, loc.state])
 
   const entrarSocio = useCallback(async (p: string) => {
+    if (sinBase) { setError(AVISO_SIN_BASE); setPin(''); return }
     setCargando(true); setError(null)
     try {
       const pf = await ingresarSocio(dni, p)
@@ -37,17 +39,18 @@ export default function Ingresar({ sinBase = false }: { sinBase?: boolean }) {
       setError((e as Error).message)
       setPin('')
     } finally { setCargando(false) }
-  }, [dni, ingresarSocio, navegar])
+  }, [dni, ingresarSocio, navegar, sinBase])
 
   const tecla = useCallback((d: string) => {
     setError(null)
-    setPin((p) => {
-      if (p.length >= 6) return p
-      const n = p + d
-      if (n.length === 6) window.setTimeout(() => entrarSocio(n), 120)
-      return n
-    })
-  }, [entrarSocio])
+    setPin((p) => (p.length >= 6 ? p : p + d))
+  }, [])
+  // Con el sexto número se intenta entrar (una sola vez, fuera del actualizador de estado)
+  useEffect(() => {
+    if (pin.length !== 6) return
+    const t = window.setTimeout(() => entrarSocio(pin), 120)
+    return () => clearTimeout(t)
+  }, [pin, entrarSocio])
   const borrar = useCallback(() => setPin((p) => p.slice(0, -1)), [])
 
   const continuarDni = (e?: React.FormEvent) => {
@@ -61,6 +64,7 @@ export default function Ingresar({ sinBase = false }: { sinBase?: boolean }) {
     e.preventDefault()
     if (!correo.includes('@')) { setError('Escribe tu correo completo.'); return }
     if (clave.length < 6) { setError('La clave tiene al menos 6 caracteres.'); return }
+    if (sinBase) { setError(AVISO_SIN_BASE); return }
     setCargando(true); setError(null)
     try {
       const pf = await ingresarStaff(correo, clave)
