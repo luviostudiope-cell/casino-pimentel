@@ -42,7 +42,12 @@ export default function App() {
       <Routes>
         <Route path="/sistema" element={<Sistema />} />
         {!supabaseConfigurado ? (
-          <Route path="*" element={<SinConfigurar />} />
+          <>
+            {/* Sin base conectada se puede ver el ingreso, pero no entrar */}
+            <Route path="/" element={<Navigate to="/ingresar" replace />} />
+            <Route path="/ingresar" element={<Ingresar sinBase />} />
+            <Route path="*" element={<SinConfigurar />} />
+          </>
         ) : (
           <>
             <Route path="/" element={<Inicio />} />

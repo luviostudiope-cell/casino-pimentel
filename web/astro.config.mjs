@@ -10,8 +10,10 @@ export default defineConfig({
   trailingSlash: 'ignore',
   build: { format: 'directory' },
   integrations: [sitemap({ filter: (p) => !p.includes('/app') })],
+  devToolbar: { enabled: false },
   vite: {
     resolve: { alias: { '@design': design } },
-    server: { fs: { allow: ['..'] } },
+    // En local, /app se sirve desde el servidor de la app (puerto 5173), igual que en producción es un solo sitio
+    server: { fs: { allow: ['..'] }, proxy: { '/app': { target: 'http://localhost:5173', changeOrigin: true, ws: true } } },
   },
 })

@@ -9,7 +9,7 @@ import { inicioDeRol } from '../../lib/roles'
 type Modo = 'socio' | 'personal'
 const EASE = [0.23, 1, 0.32, 1] as const
 
-export default function Ingresar() {
+export default function Ingresar({ sinBase = false }: { sinBase?: boolean }) {
   const { sesion, perfil, ingresarSocio, ingresarStaff } = useSesion()
   const navegar = useNavigate()
   const loc = useLocation()
@@ -85,6 +85,7 @@ export default function Ingresar() {
             <h1 id="titulo-ingreso" style={{ fontSize: 'var(--text-2xl)' }}>Ingresa al club</h1>
             <p className="muted" style={{ marginTop: 6 }}>Un solo ingreso para socios, administración, barra y portería.</p>
           </div>
+          {sinBase && <Aviso tono="alerta">Vista previa: la base de datos aún no está conectada, así que todavía no se puede entrar.</Aviso>}
           <Pestanas etiqueta="¿Quién ingresa?" bloque valor={modo} onCambio={(v) => { setModo(v); setError(null); setPaso('dni'); setPin('') }}
             opciones={[{ valor: 'socio', etiqueta: 'Soy socio', icono: <IdCard aria-hidden /> }, { valor: 'personal', etiqueta: 'Personal', icono: <KeyRound aria-hidden /> }]} />
 
