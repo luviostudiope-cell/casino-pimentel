@@ -18,6 +18,18 @@ function doGet() {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+/**
+ * Ejecútala una vez desde el editor (botón "Ejecutar"): pide los permisos de Google
+ * y crea la hoja "Casino de Pimentel · Base de datos" con los datos de ejemplo.
+ * Si el sistema ya está instalado no cambia nada.
+ */
+function prepararSistema() {
+  asegurarInstalacion_();
+  const url = libro_().getUrl();
+  console.log('Sistema listo. Base de datos: ' + url);
+  return 'Sistema listo';
+}
+
 /** Inserta otro archivo HTML dentro de Index (estilos, recursos, cliente). */
 function incluir(nombre) {
   return HtmlService.createHtmlOutputFromFile(nombre).getContent();
