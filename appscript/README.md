@@ -18,13 +18,28 @@ node appscript/dev/probar.mjs capturas
 
 Entra con cada rol, recorre las pantallas, hace las acciones principales y guarda capturas.
 
-## Publicarlo en Google
+## Publicado en Google
 
-1. Activa la API de Apps Script en https://script.google.com/home/usersettings
-2. Inicia sesión con la cuenta de Google del club: `npx clasp login` (desde la carpeta `appscript`)
-3. La primera vez: `npx clasp create-script --type standalone --title "Casino de Pimentel" --rootDir src`
-4. Sube y publica: `npm run publicar`
-5. Abre el enlace de la web app. La primera vez Google pide autorizar el acceso a Sheets; al entrar se crea la hoja "Casino de Pimentel · Base de datos" con los datos de ejemplo.
+- Web app: https://script.google.com/macros/s/AKfycbyIuh872nN7qy3mP9R3z6mOwbKDSsZkpSzU7OVp17ypTo8J34uEkT1TSh-MBw_ixb9L/exec
+- Proyecto (cuenta luviostudiope@gmail.com): https://script.google.com/d/1JHnG1GtkJ6jClpuGBqbKa9KXepw6-U7B3mZeDuViUbo5doUTmZ4_lcKa/edit
+- Prueba del enlace publicado: `node appscript/dev/probar-google.mjs <url-de-la-web-app> capturas-google`
+
+Para subir cambios manteniendo el mismo enlace (desde la carpeta `appscript`):
+
+```bash
+npx clasp push --force
+npx clasp create-deployment -i AKfycbyIuh872nN7qy3mP9R3z6mOwbKDSsZkpSzU7OVp17ypTo8J34uEkT1TSh-MBw_ixb9L -d "descripción del cambio"
+```
+
+Si algún día se agregan permisos nuevos en `appsscript.json` (por ejemplo para Telegram), hay que ejecutar `prepararSistema` una vez desde el editor y volver a tocar "Permitir".
+
+### Cómo se publicó la primera vez
+
+1. Activar la API de Apps Script en https://script.google.com/home/usersettings
+2. `npx clasp login` con la cuenta de Google del club
+3. `npx clasp create-script --type standalone --title "Casino de Pimentel" --rootDir src`
+4. `npx clasp push --force` y `npx clasp create-deployment`
+5. En el editor, ejecutar `prepararSistema` y tocar "Permitir": autoriza Sheets y crea la hoja "Casino de Pimentel · Base de datos" con los datos de ejemplo.
 
 ## Archivos
 
