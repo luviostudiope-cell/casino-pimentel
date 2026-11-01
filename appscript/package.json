@@ -1,0 +1,16 @@
+{
+  "name": "casino-pimentel-appscript",
+  "private": true,
+  "description": "Sistema del Casino de Pimentel en Google Apps Script con Google Sheets",
+  "type": "module",
+  "scripts": {
+    "local": "node dev/servidor.mjs",
+    "probar": "node dev/probar.mjs capturas",
+    "recursos": "node dev/generar-recursos.mjs",
+    "subir": "clasp push --force",
+    "publicar": "clasp push --force && clasp create-deployment --description \"Casino de Pimentel\""
+  },
+  "devDependencies": {
+    "@google/clasp": "^3.4.1"
+  }
+}

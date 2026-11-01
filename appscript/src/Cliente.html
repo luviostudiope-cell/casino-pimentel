@@ -1,0 +1,1318 @@
+<script>
+(function () {
+  'use strict';
+
+  // ================= Base =================
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var app = $('#app'), capa = $('#capa'), avisoEl = $('#aviso');
+  var E = { token: null, perfil: null, vista: null, params: {}, datos: {}, seq: 0, pedido: {}, teclado: null };
+
+  var almacen = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { /* sin almacenamiento */ } },
+  };
+
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+  }
+  function ic(n) {
+    return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (window.ICONOS[n] || '') + '</svg>';
+  }
+  function soles(n) {
+    return 'S/ ' + Number(n || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function solesCorto(n) {
+    return 'S/ ' + Number(n || 0).toLocaleString('es-PE', { maximumFractionDigits: 0 });
+  }
+  var DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  function partes(iso) { var p = String(iso).split('-').map(Number); return { a: p[0], m: p[1], d: p[2], f: new Date(Date.UTC(p[0], p[1] - 1, p[2], 12)) }; }
+  function fechaLarga(iso) { var p = partes(iso); return DIAS[p.f.getUTCDay()] + ' ' + p.d + ' de ' + MESES[p.m - 1]; }
+  function fechaMedia(iso) { var p = partes(iso); return DIAS[p.f.getUTCDay()].slice(0, 3) + ' ' + p.d + ' ' + MESES[p.m - 1].slice(0, 3); }
+  function fechaCorta(iso) { var p = partes(iso); return p.d + ' ' + MESES[p.m - 1].slice(0, 3); }
+  function diaRelativo(iso, hoy) {
+    if (iso === hoy) return 'Hoy';
+    var dif = Math.round((partes(iso).f - partes(hoy).f) / 86400000);
+    if (dif === 1) return 'Mañana';
+    if (dif === -1) return 'Ayer';
+    return fechaMedia(iso);
+  }
+  function mesDe(periodo) { var p = String(periodo).split('-').map(Number); return MESES[p[1] - 1] + ' ' + p[0]; }
+  function sumarDias(iso, n) { var p = partes(iso); var f = new Date(Date.UTC(p.a, p.m - 1, p.d + n, 12)); return f.toISOString().slice(0, 10); }
+  function iniciales(nombre) {
+    var p = String(nombre || '').split(' ').filter(Boolean);
+    if (!p.length) return '·';
+    var segundo = p.length >= 4 ? p[p.length - 2] : (p[1] || '');
+    return (p[0][0] + (segundo[0] || '')).toUpperCase();
+  }
+  function saludo() { var h = new Date().getHours(); return h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches'; }
+  function plural(n, uno, varios) { return n + ' ' + (n === 1 ? uno : varios); }
+
+  // ================= Comunicación con el servidor =================
+  function llamar(accion, datos) {
+    return new Promise(function (ok, mal) {
+      google.script.run
+        .withSuccessHandler(function (r) {
+          if (r && r.ok) return ok(r.datos);
+          if (r && r.sinSesion && accion !== 'salir') { cerrarSesionLocal(); render(); }
+          mal(new Error((r && r.error) || 'No hubo respuesta del sistema.'));
+        })
+        .withFailureHandler(function (e) {
+          var m = String(e && e.message || e);
+          mal(new Error(/network|fetch|conexi/i.test(m) ? 'No hay conexión a internet. Revisa y vuelve a intentar.' : 'Hubo un problema con el sistema. Intenta otra vez.'));
+        })
+        .api(accion, E.token, datos || {});
+    });
+  }
+
+  // ================= Avisos, ventana emergente y estados =================
+  var avisoTiempo;
+  function avisar(texto, tipo) {
+    tipo = tipo || 'ok';
+    avisoEl.className = tipo;
+    avisoEl.innerHTML = ic(tipo === 'ok' ? 'ok' : 'alerta') + '<span>' + esc(texto) + '</span>';
+    void avisoEl.offsetWidth;
+    avisoEl.classList.add('visible');
+    clearTimeout(avisoTiempo);
+    avisoTiempo = setTimeout(function () { avisoEl.classList.remove('visible'); }, tipo === 'ok' ? 3400 : 6000);
+  }
+  function fallo(e) { avisar(e && e.message ? e.message : String(e), 'error'); }
+
+  var focoAnterior = null;
+  function abrirModal(html, alAbrir) {
+    focoAnterior = document.activeElement;
+    capa.innerHTML = '<div class="modal" role="dialog" aria-modal="true">' + html + '</div>';
+    capa.classList.add('abierta');
+    document.body.style.overflow = 'hidden';
+    var m = capa.firstElementChild;
+    if (alAbrir) alAbrir(m);
+    setTimeout(function () {
+      var f = m.querySelector('[autofocus]') || m.querySelector('input:not([type=radio]):not([type=checkbox]), select, textarea');
+      if (f && window.matchMedia('(pointer: fine)').matches) f.focus();
+    }, 40);
+  }
+  function cerrarModal() {
+    capa.classList.remove('abierta');
+    capa.innerHTML = '';
+    document.body.style.overflow = '';
+    if (focoAnterior && focoAnterior.focus) try { focoAnterior.focus(); } catch (e) { /* nada */ }
+  }
+  capa.addEventListener('mousedown', function (e) { if (e.target === capa) cerrarModal(); });
+  function modalCab(titulo, sub) {
+    return '<div class="modal-cab"><div><h2>' + esc(titulo) + '</h2>' + (sub ? '<p>' + esc(sub) + '</p>' : '') + '</div>' +
+      '<button type="button" class="btn btn-icono btn-plano" data-a="cerrarModal" aria-label="Cerrar">' + ic('cerrar') + '</button></div>';
+  }
+  function confirmar(titulo, texto, boton, peligro) {
+    return new Promise(function (ok) {
+      abrirModal(modalCab(titulo) + '<p style="color:var(--tinta-2)">' + esc(texto) + '</p><div class="modal-pie mt-l">' +
+        '<button class="btn" data-a="cerrarModal">Volver</button><button class="btn ' + (peligro ? 'btn-peligro-lleno' : 'btn-primario') + '" id="btnSi">' + esc(boton) + '</button></div>',
+        function (m) { $('#btnSi', m).addEventListener('click', function () { cerrarModal(); ok(true); }); });
+    });
+  }
+  function ocupado(btn, si) {
+    if (!btn) return;
+    if (si) { btn.dataset.texto = btn.innerHTML; btn.classList.add('ocupado'); btn.innerHTML = '<span class="giro" style="width:20px;height:20px;border-width:2px"></span> Guardando…'; }
+    else { btn.classList.remove('ocupado'); if (btn.dataset.texto) btn.innerHTML = btn.dataset.texto; }
+  }
+  function cargando() { return '<div class="cargando" role="status"><div class="giro"></div><span>Cargando…</span></div>'; }
+  function vacio(icono, texto) { return '<div class="vacio">' + ic(icono) + '<p>' + esc(texto) + '</p></div>'; }
+  function cabecera(titulo, sub, acciones) {
+    return '<header class="cabecera"><h1>' + esc(titulo) + '</h1>' + (sub ? '<p class="sub">' + esc(sub) + '</p>' : '') +
+      (acciones ? '<div class="acciones-cabecera">' + acciones + '</div>' : '') + '</header>';
+  }
+  function pestanas(opciones, activa, accion) {
+    return '<div class="centro-x mb"><div class="pestanas" role="tablist">' + opciones.map(function (o) {
+      return '<button role="tab" aria-selected="' + (o[0] === activa) + '" class="' + (o[0] === activa ? 'activo' : '') + '" data-a="' + accion + '" data-v="' + o[0] + '">' + esc(o[1]) + '</button>';
+    }).join('') + '</div></div>';
+  }
+  function opciones(nombre, lista, elegido) {
+    return '<div class="opciones" role="radiogroup">' + lista.map(function (o) {
+      return '<label class="opcion"><input type="radio" name="' + nombre + '" value="' + esc(o[0]) + '"' + (o[0] === elegido ? ' checked' : '') + '><span>' + esc(o[1]) + '</span></label>';
+    }).join('') + '</div>';
+  }
+  var MEDIOS = [['efectivo', 'Efectivo'], ['yape', 'Yape'], ['plin', 'Plin'], ['tarjeta', 'Tarjeta'], ['transferencia', 'Transferencia']];
+  function campo(etq, html, ayuda) { return '<label class="campo"><span>' + esc(etq) + '</span>' + html + (ayuda ? '<small>' + esc(ayuda) + '</small>' : '') + '</label>'; }
+  function entrada(nombre, valor, extra) { return '<input class="entrada" name="' + nombre + '" value="' + esc(valor == null ? '' : valor) + '" ' + (extra || '') + '>'; }
+  function datosForm(f) {
+    var o = {};
+    new FormData(f).forEach(function (v, k) { o[k] = v; });
+    return o;
+  }
+  function estadoSocio(s) {
+    if (s.estado === 'suspendido') return '<span class="etiqueta peligro">Suspendido</span>';
+    if (s.cuenta.alDia) return '<span class="etiqueta ok">Al día</span>';
+    return '<span class="etiqueta alerta">Debe ' + plural(s.cuenta.vencidas, 'cuota', 'cuotas') + '</span>';
+  }
+
+  // ================= Acciones por clic y formularios =================
+  var ACC = {}, FORM = {}, ENTRADA = {};
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-a]');
+    if (!el || el.disabled) return;
+    var fn = ACC[el.dataset.a];
+    if (fn) { e.preventDefault(); fn(el, e); }
+  });
+  document.addEventListener('submit', function (e) {
+    var f = e.target.closest('form[data-f]');
+    if (!f) return;
+    e.preventDefault();
+    var fn = FORM[f.dataset.f];
+    if (fn) fn(f, datosForm(f), f.querySelector('[type=submit]'));
+  });
+  document.addEventListener('input', function (e) {
+    var el = e.target.closest('[data-in]');
+    if (el && ENTRADA[el.dataset.in]) ENTRADA[el.dataset.in](el, e);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && capa.classList.contains('abierta')) { cerrarModal(); return; }
+    if (!E.teclado || capa.classList.contains('abierta')) return;
+    var t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+    if (/^\d$/.test(e.key)) { e.preventDefault(); E.teclado.tecla(e.key); }
+    else if (e.key === 'Backspace') { e.preventDefault(); E.teclado.borrar(); }
+  });
+  ACC.cerrarModal = cerrarModal;
+
+  function teclado(prefijo) {
+    var t = '';
+    ['1', '2', '3', '4', '5', '6', '7', '8', '9'].forEach(function (d) { t += '<button type="button" class="tecla" data-a="' + prefijo + 'Tecla" data-d="' + d + '">' + d + '</button>'; });
+    t += '<button type="button" class="tecla suave" data-a="' + prefijo + 'Borrar" aria-label="Borrar">' + ic('retroceso') + '</button>';
+    t += '<button type="button" class="tecla" data-a="' + prefijo + 'Tecla" data-d="0">0</button><span></span>';
+    return '<div class="teclado">' + t + '</div>';
+  }
+  function puntos(llenos, total, error) {
+    var h = '';
+    for (var i = 0; i < total; i++) h += '<i class="' + (i < llenos ? 'lleno' : '') + '"></i>';
+    return '<div class="puntos' + (error ? ' error' : '') + '" aria-label="' + llenos + ' de ' + total + ' números">' + h + '</div>';
+  }
+
+  // ================= Sesión =================
+  function cerrarSesionLocal() { E.token = null; E.perfil = null; E.vista = null; E.pedido = {}; almacen.set('cp_token', null); }
+
+  var MENU = {
+    admin: ['inicio', 'porteria', 'socios', 'barra', 'caja', 'personal', 'reservas', 'alquileres', 'avisos'],
+    directiva: ['inicio', 'porteria', 'socios', 'barra', 'caja', 'personal', 'reservas', 'alquileres', 'avisos'],
+    porteria: ['porteria', 'reservas'],
+    barra: ['barra'],
+    socio: ['micuenta', 'carnet', 'reservas'],
+  };
+  var NAV = {
+    inicio: ['Inicio', 'inicio'], porteria: ['Portería', 'porteria'], socios: ['Socios', 'socios'], barra: ['Barra', 'barra'],
+    caja: ['Caja', 'caja'], personal: ['Personal', 'personal'], reservas: ['Tenis', 'reservas'], alquileres: ['Alquileres', 'alquileres'],
+    avisos: ['Avisos', 'avisos'], ajustes: ['Ajustes', 'ajustes'], micuenta: ['Mi cuenta', 'inicio'], carnet: ['Carnet', 'carnet'], socio: ['Socios', 'socios'],
+  };
+
+  function ir(vista, params) {
+    E.vista = vista;
+    E.params = params || {};
+    E.teclado = null;
+    almacen.set('cp_vista', vista);
+    pintarVista();
+    window.scrollTo(0, 0);
+  }
+  ACC.ir = function (el) {
+    var p = {};
+    Object.keys(el.dataset).forEach(function (k) { if (k !== 'a' && k !== 'v') p[k] = el.dataset[k]; });
+    cerrarModal();
+    ir(el.dataset.v, p);
+  };
+  ACC.salir = function () {
+    confirmar('¿Salir del sistema?', 'Tendrás que volver a ingresar con tu usuario o tu DNI.', 'Salir').then(function () {
+      llamar('salir').catch(function () { /* igual se cierra */ });
+      cerrarSesionLocal();
+      render();
+    });
+  };
+
+  function render() {
+    E.teclado = null;
+    if (!E.token || !E.perfil) return pintarAcceso();
+    if (E.perfil.debeCambiarPin) return pintarCambiarPin();
+    pintarMarco();
+  }
+
+  // ================= Pantalla de ingreso =================
+  var ingreso = { modo: 'socio', paso: 'dni', dni: '', pin: '', error: '' };
+  function pintarAcceso() {
+    var cuerpo;
+    if (ingreso.modo === 'socio' && ingreso.paso === 'dni') {
+      cuerpo = '<form class="formulario" data-f="dni" novalidate>' +
+        campo('Tu DNI', '<input class="entrada dni-entrada" name="dni" inputmode="numeric" autocomplete="username" maxlength="8" placeholder="8 números" value="' + esc(ingreso.dni) + '" autofocus>') +
+        '<div class="error-campo" role="alert">' + esc(ingreso.error) + '</div>' +
+        '<button class="btn btn-primario btn-lg btn-bloque" type="submit">Continuar</button></form>';
+    } else if (ingreso.modo === 'socio') {
+      cuerpo = '<div class="pila" style="align-items:center">' +
+        '<div style="display:flex;width:100%;align-items:center;justify-content:space-between"><button class="btn btn-sm btn-plano" data-a="cambiarDni">' + ic('atras') + ' Cambiar DNI</button><span class="num" style="color:var(--gris)">DNI ' + esc(ingreso.dni) + '</span></div>' +
+        '<p style="font-weight:500;font-size:18px">Escribe tu PIN de 6 números</p>' +
+        '<div id="puntosPin">' + puntos(ingreso.pin.length, 6, Boolean(ingreso.error)) + '</div>' +
+        '<div class="error-campo" role="alert" id="errorPin" style="text-align:center">' + esc(ingreso.error) + '</div>' +
+        teclado('pin') + '</div>';
+      E.teclado = { tecla: function (d) { ACC.pinTecla({ dataset: { d: d } }); }, borrar: function () { ACC.pinBorrar(); } };
+    } else {
+      cuerpo = '<form class="formulario" data-f="personal" novalidate>' +
+        campo('Usuario', '<input class="entrada" name="usuario" autocomplete="username" autocapitalize="none" placeholder="Por ejemplo: porteria" autofocus>') +
+        campo('Clave', '<input class="entrada" name="clave" type="password" autocomplete="current-password">') +
+        '<div class="error-campo" role="alert">' + esc(ingreso.error) + '</div>' +
+        '<button class="btn btn-primario btn-lg btn-bloque" type="submit">Ingresar</button></form>';
+    }
+    app.innerHTML = '<main class="acceso"><div class="acceso-caja">' +
+      '<img class="acceso-logo" src="' + window.LOGO_CLUB + '" alt="Casino de Pimentel">' +
+      cabecera('Bienvenido al club', ingreso.modo === 'socio' ? 'Ingresa con tu DNI y tu PIN' : 'Ingresa con tu usuario del club') +
+      '<div class="pestanas" role="tablist">' +
+      '<button role="tab" class="' + (ingreso.modo === 'socio' ? 'activo' : '') + '" data-a="modoIngreso" data-v="socio">Soy socio</button>' +
+      '<button role="tab" class="' + (ingreso.modo === 'personal' ? 'activo' : '') + '" data-a="modoIngreso" data-v="personal">Personal del club</button></div>' +
+      '<section class="tarjeta">' + cuerpo + '</section>' +
+      '<p class="acceso-pie">¿Olvidaste tu PIN o tu clave? Pídelo en administración.</p>' +
+      (E.ejemplo ? '<span class="etiqueta sol">Datos de ejemplo</span>' : '') +
+      '</div></main>';
+    var f = app.querySelector('[autofocus]');
+    if (f && window.matchMedia('(pointer: fine)').matches) f.focus();
+  }
+  ACC.modoIngreso = function (el) { ingreso.modo = el.dataset.v; ingreso.paso = 'dni'; ingreso.pin = ''; ingreso.error = ''; pintarAcceso(); };
+  ACC.cambiarDni = function () { ingreso.paso = 'dni'; ingreso.pin = ''; ingreso.error = ''; pintarAcceso(); };
+  FORM.dni = function (f, d) {
+    var dni = String(d.dni || '').replace(/\D/g, '');
+    if (dni.length !== 8) { ingreso.error = 'Escribe tu DNI completo: son 8 números.'; ingreso.dni = dni; pintarAcceso(); return; }
+    ingreso.dni = dni; ingreso.paso = 'pin'; ingreso.pin = ''; ingreso.error = '';
+    pintarAcceso();
+  };
+  function repintarPin() {
+    var p = $('#puntosPin'); if (p) p.innerHTML = puntos(ingreso.pin.length, 6, Boolean(ingreso.error));
+    var e = $('#errorPin'); if (e) e.textContent = ingreso.error;
+  }
+  var enviandoPin = false;
+  ACC.pinTecla = function (el) {
+    if (enviandoPin || ingreso.pin.length >= 6) return;
+    ingreso.error = '';
+    ingreso.pin += el.dataset.d;
+    repintarPin();
+    if (ingreso.pin.length === 6) {
+      enviandoPin = true;
+      var e = $('#errorPin'); if (e) e.textContent = 'Entrando…';
+      llamar('ingresar', { modo: 'socio', dni: ingreso.dni, pin: ingreso.pin }).then(entrar).catch(function (er) {
+        ingreso.error = er.message; ingreso.pin = ''; repintarPin();
+      }).then(function () { enviandoPin = false; });
+    }
+  };
+  ACC.pinBorrar = function () { if (enviandoPin) return; ingreso.pin = ingreso.pin.slice(0, -1); ingreso.error = ''; repintarPin(); };
+  FORM.personal = function (f, d, btn) {
+    ocupado(btn, true);
+    llamar('ingresar', { modo: 'personal', usuario: d.usuario, clave: d.clave }).then(entrar).catch(function (er) {
+      ingreso.error = er.message; pintarAcceso();
+      var u = app.querySelector('[name=usuario]'); if (u) u.value = d.usuario || '';
+      var c = app.querySelector('[name=clave]'); if (c) c.focus();
+    });
+  };
+  function entrar(r) {
+    E.token = r.token; E.perfil = r.perfil; E.ejemplo = r.perfil.ejemplo;
+    almacen.set('cp_token', r.token);
+    ingreso = { modo: ingreso.modo, paso: 'dni', dni: '', pin: '', error: '' };
+    E.vista = MENU[r.perfil.rol][0];
+    render();
+  }
+
+  // ================= Primer ingreso del socio: crear su PIN =================
+  var nuevoPin = { primero: '', pin: '', error: '' };
+  function pintarCambiarPin() {
+    app.innerHTML = '<main class="acceso"><div class="acceso-caja">' +
+      '<img class="acceso-logo" src="' + window.LOGO_CLUB + '" alt="Casino de Pimentel">' +
+      cabecera(nuevoPin.primero ? 'Repite tu nuevo PIN' : 'Crea tu PIN personal', nuevoPin.primero ? 'Escríbelo otra vez para confirmar' : 'Son 6 números que solo tú vas a saber') +
+      '<section class="tarjeta pila" style="align-items:center">' +
+      '<div id="puntosPin">' + puntos(nuevoPin.pin.length, 6, Boolean(nuevoPin.error)) + '</div>' +
+      '<div class="error-campo" id="errorPin" role="alert" style="text-align:center">' + esc(nuevoPin.error) + '</div>' + teclado('npin') +
+      '<div class="nota">' + ic('info') + '<span>No uses tu fecha de nacimiento ni números seguidos como 123456.</span></div></section>' +
+      '<button class="btn btn-plano" data-a="salirDirecto">Salir</button></div></main>';
+    E.teclado = { tecla: function (d) { ACC.npinTecla({ dataset: { d: d } }); }, borrar: function () { ACC.npinBorrar(); } };
+  }
+  ACC.salirDirecto = function () { llamar('salir').catch(function () {}); cerrarSesionLocal(); render(); };
+  ACC.npinTecla = function (el) {
+    if (nuevoPin.pin.length >= 6 || nuevoPin.enviando) return;
+    nuevoPin.error = '';
+    nuevoPin.pin += el.dataset.d;
+    var p = $('#puntosPin'); if (p) p.innerHTML = puntos(nuevoPin.pin.length, 6, false);
+    if (nuevoPin.pin.length < 6) return;
+    setTimeout(function () {
+      var pin = nuevoPin.pin;
+      if (!nuevoPin.primero) {
+        if (/^(\d)\1+$/.test(pin) || '0123456789'.indexOf(pin) >= 0 || '9876543210'.indexOf(pin) >= 0) { nuevoPin.error = 'Ese PIN es muy fácil de adivinar. Elige otro.'; nuevoPin.pin = ''; }
+        else { nuevoPin.primero = pin; nuevoPin.pin = ''; }
+        return pintarCambiarPin();
+      }
+      if (pin !== nuevoPin.primero) { nuevoPin = { primero: '', pin: '', error: 'Los PIN no coinciden. Empecemos otra vez.' }; return pintarCambiarPin(); }
+      nuevoPin.enviando = true;
+      llamar('cambiarPin', { pin: pin }).then(function () {
+        nuevoPin = { primero: '', pin: '', error: '' };
+        E.perfil.debeCambiarPin = false;
+        avisar('Listo. Desde ahora entras con tu nuevo PIN.');
+        render();
+      }).catch(function (er) { nuevoPin = { primero: '', pin: '', error: er.message }; pintarCambiarPin(); });
+    }, 140);
+  };
+  ACC.npinBorrar = function () { nuevoPin.pin = nuevoPin.pin.slice(0, -1); var p = $('#puntosPin'); if (p) p.innerHTML = puntos(nuevoPin.pin.length, 6, false); };
+
+  // ================= Marco: menú lateral, barra móvil =================
+  function itemNav(v, clase) {
+    var n = NAV[v];
+    return '<button class="item ' + (clase || '') + '" data-a="ir" data-v="' + v + '" data-nav="' + v + '">' + ic(n[1]) + '<span>' + n[0] + '</span></button>';
+  }
+  function pintarMarco() {
+    var items = MENU[E.perfil.rol];
+    if (!E.vista) E.vista = almacen.get('cp_vista') || items[0];
+    var permitidas = items.concat(E.perfil.rol === 'admin' ? ['ajustes'] : []).concat(E.perfil.rol === 'admin' || E.perfil.rol === 'directiva' ? ['socio'] : []);
+    if (permitidas.indexOf(E.vista) < 0) E.vista = items[0];
+    var movil = items.length > 4 ? items.slice(0, 4) : items;
+    app.innerHTML = '<div class="marco">' +
+      '<aside class="riel" aria-label="Menú principal">' +
+      '<a class="marca" data-a="ir" data-v="' + items[0] + '" title="Casino de Pimentel"><img src="' + window.SOL_CLUB + '" alt="Casino de Pimentel"></a>' +
+      '<nav>' + items.map(function (v) { return itemNav(v); }).join('') + '</nav>' +
+      '<div class="riel-pie">' + (E.perfil.rol === 'admin' ? itemNav('ajustes') : '') +
+      '<button class="item" data-a="salir">' + ic('salir') + '<span>Salir</span></button></div></aside>' +
+      '<header class="barra-sup"><img src="' + window.SOL_CLUB + '" alt=""><div class="titulo" id="tituloMovil">Casino de Pimentel<small>' + esc(E.perfil.nombre === E.perfil.rolNombre ? E.perfil.rolNombre : E.perfil.rolNombre + ' · ' + E.perfil.nombre) + '</small></div>' +
+      '<button class="btn btn-icono btn-plano" data-a="salir" aria-label="Salir">' + ic('salir') + '</button></header>' +
+      '<main class="contenido" id="vista"></main>' +
+      '<nav class="tabbar" aria-label="Menú">' + movil.map(function (v) { return itemNav(v); }).join('') +
+      (items.length > 4 ? '<button class="item" data-a="masMenu">' + ic('menu') + '<span>Más</span></button>' : '') + '</nav>' +
+      (E.perfil.ejemplo ? '<span class="marca-ejemplo"><i></i>Datos de ejemplo</span>' : '') +
+      '</div>';
+    pintarVista();
+  }
+  ACC.masMenu = function () {
+    var items = MENU[E.perfil.rol].slice(4).concat(E.perfil.rol === 'admin' ? ['ajustes'] : []);
+    abrirModal(modalCab('Más opciones') + '<div class="lista">' + items.map(function (v) {
+      return '<div class="fila boton" data-a="ir" data-v="' + v + '"><span class="icono-circulo azul">' + ic(NAV[v][1]) + '</span><div class="principal"><div class="nombre">' + NAV[v][0] + '</div></div>' + ic('derecha') + '</div>';
+    }).join('') + '</div>');
+  };
+
+  function marcarNav() {
+    var activa = E.vista === 'socio' ? 'socios' : E.vista;
+    document.querySelectorAll('[data-nav]').forEach(function (b) {
+      var si = b.dataset.nav === activa;
+      b.classList.toggle('activo', si);
+      if (si) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    });
+  }
+
+  var VISTAS = {};
+  function pintarVista() {
+    var cont = $('#vista');
+    if (!cont) return;
+    marcarNav();
+    var n = ++E.seq;
+    cont.innerHTML = cargando();
+    var fn = VISTAS[E.vista];
+    Promise.resolve().then(function () { return fn(cont, n); }).catch(function (e) {
+      if (n !== E.seq) return;
+      cont.innerHTML = '<div class="vacio">' + ic('alerta') + '<p>' + esc(e.message) + '</p><button class="btn mt" data-a="recargar">' + ic('recargar') + ' Reintentar</button></div>';
+    });
+  }
+  ACC.recargar = function () { pintarVista(); };
+  function vigente(n) { return n === E.seq; }
+
+  // ================= INICIO (administración y directiva) =================
+  function cifra(icono, etq, valor, det, destino) {
+    var etiqueta = destino ? 'button' : 'div';
+    return '<' + etiqueta + ' class="tarjeta cifra"' + (destino ? ' data-a="ir" data-v="' + destino + '"' : '') + '><div class="etq">' + ic(icono) + esc(etq) + '</div>' +
+      '<div class="valor">' + esc(valor) + '</div><div class="det">' + esc(det) + '</div></' + etiqueta + '>';
+  }
+  function filaAlerta(icono, tono, titulo, meta, destino, extra) {
+    return '<div class="fila boton" data-a="ir" data-v="' + destino + '"' + (extra || '') + '><span class="icono-circulo ' + tono + '">' + ic(icono) + '</span>' +
+      '<div class="principal"><div class="nombre">' + esc(titulo) + '</div>' + (meta ? '<div class="meta">' + esc(meta) + '</div>' : '') + '</div>' + ic('derecha') + '</div>';
+  }
+  VISTAS.inicio = function (c, n) {
+    return llamar('resumenInicio').then(function (d) {
+      if (!vigente(n)) return;
+      var alertas = '';
+      if (d.noMarcaron.length) alertas += filaAlerta('personal', 'peligro', plural(d.noMarcaron.length, 'trabajador no marcó su entrada', 'trabajadores no marcaron su entrada'), d.noMarcaron.map(function (p) { return p.nombre.split(' ')[0]; }).join(', '), 'personal');
+      if (d.stockBajo.length) alertas += filaAlerta('paquete', 'alerta', plural(d.stockBajo.length, 'producto con poco stock', 'productos con poco stock'), d.stockBajo.slice(0, 3).map(function (p) { return p.nombre + ' (' + p.stock + ')'; }).join(', '), 'barra', ' data-tab="stock"');
+      if (d.socios.morosos) alertas += filaAlerta('socios', 'alerta', plural(d.socios.morosos, 'socio debe 2 cuotas o más', 'socios deben 2 cuotas o más'), soles(d.socios.deuda) + ' en cuotas vencidas', 'socios', ' data-filtro="deuda"');
+      d.alquileres.filter(function (a) { return a.estado === 'reservado'; }).forEach(function (a) {
+        alertas += filaAlerta('alquileres', 'azul', a.ambiente + ' sin adelanto', diaRelativo(a.fecha, d.hoy) + ' · ' + a.cliente, 'alquileres');
+      });
+      alertas += filaAlerta('dinero', 'ok', 'Este mes se cobraron ' + soles(d.cobradoMes) + ' en cuotas', 'Ver estado de los socios', 'socios');
+      var max = Math.max.apply(null, d.dias.map(function (x) { return x.ventas; }).concat([1]));
+      var barras = d.dias.map(function (x) {
+        var alto = Math.max(3, Math.round(x.ventas / max * 100));
+        return '<div class="col' + (x.fecha === d.hoy ? ' hoy' : '') + '" title="' + esc(fechaLarga(x.fecha) + ': ' + soles(x.ventas)) + '"><span class="v">' + solesCorto(x.ventas) + '</span><div class="b" style="height:' + alto + '%"></div><span class="d">' + (x.fecha === d.hoy ? 'hoy' : DIAS[partes(x.fecha).f.getUTCDay()].slice(0, 3)) + '</span></div>';
+      }).join('');
+      var alq = d.alquileres.length ? d.alquileres.map(function (a) {
+        var p = partes(a.fecha);
+        return '<div class="fila boton" data-a="ir" data-v="alquileres"><div class="fecha-bloque"><b>' + p.d + '</b><span>' + MESES[p.m - 1].slice(0, 3) + '</span></div><div class="principal"><div class="nombre">' + esc(a.ambiente) + '</div><div class="meta">' + esc(a.cliente) + '</div></div>' +
+          '<div class="lado">' + (a.saldo > 0 ? '<div class="meta">Saldo</div><div class="monto">' + soles(a.saldo) + '</div>' : '<span class="etiqueta ok">Pagado</span>') + '</div></div>';
+      }).join('') : vacio('alquileres', 'No hay alquileres en las próximas dos semanas.');
+      var movs = d.movimientos.length ? d.movimientos.map(function (m) {
+        return '<div class="fila"><span class="hora">' + esc(m.hora) + '</span><div class="principal"><div class="nombre">' + esc(m.concepto) + '</div><div class="meta">' + esc(m.medio) + '</div></div><div class="lado monto" style="color:' + (m.tipo === 'egreso' ? 'var(--peligro)' : 'var(--tinta)') + '">' + (m.tipo === 'egreso' ? '− ' : '') + soles(m.monto) + '</div></div>';
+      }).join('') : vacio('caja', 'Todavía no hay movimientos hoy.');
+      c.innerHTML = cabecera(saludo() + ', ' + E.perfil.nombre, 'Así va el club hoy, ' + fechaLarga(d.hoy)) +
+        '<section class="cifras">' +
+        cifra('porteria', 'Dentro del club', String(d.dentro), plural(d.ingresosHoy, 'ingreso', 'ingresos') + ' hoy · ' + plural(d.invitadosHoy, 'invitado', 'invitados'), 'porteria') +
+        cifra('barra', 'Ventas de barra', soles(d.ventasHoy.total), plural(d.ventasHoy.cantidad, 'venta', 'ventas') + ' hoy', 'barra') +
+        cifra('caja', 'Caja de hoy', soles(d.caja.saldo), 'Entró ' + soles(d.caja.ingresos) + ' · salió ' + soles(d.caja.egresos), 'caja') +
+        cifra('socios', 'Socios al día', d.socios.alDia + ' de ' + d.socios.total, plural(d.socios.total - d.socios.alDia, 'socio con cuotas vencidas', 'socios con cuotas vencidas'), 'socios') +
+        '</section>' +
+        '<div class="rejilla-2"><section class="tarjeta"><div class="tarjeta-cab"><h2>Para revisar hoy</h2></div><div class="lista">' + alertas + '</div></section>' +
+        '<section class="tarjeta tarjeta-flex"><div class="tarjeta-cab"><h2>Ventas de barra</h2><p>Últimos 7 días</p></div><div class="barras" role="img" aria-label="Ventas de barra de los últimos 7 días">' + barras + '</div></section></div>' +
+        '<div class="rejilla-2"><section class="tarjeta"><div class="tarjeta-cab"><h2>Próximos alquileres</h2><button class="btn btn-sm" data-a="ir" data-v="alquileres">Ver todos</button></div><div class="lista">' + alq + '</div></section>' +
+        '<section class="tarjeta"><div class="tarjeta-cab"><h2>Últimos movimientos de caja</h2><button class="btn btn-sm" data-a="ir" data-v="caja">Ver caja</button></div><div class="lista">' + movs + '</div></section></div>';
+    });
+  };
+
+  // ================= PORTERÍA =================
+  VISTAS.porteria = function (c, n) {
+    var tab = E.params.tab || 'ingresos';
+    return llamar('porteriaHoy').then(function (d) {
+      if (!vigente(n)) return;
+      E.datos.porteria = d;
+      var cab = cabecera('Portería', tab === 'ingresos' ? 'Busca al socio por DNI, nombre o carnet' : 'El personal marca su entrada y salida con su PIN');
+      var tabs = pestanas([['ingresos', 'Ingresos al club'], ['asistencia', 'Asistencia del personal']], tab, 'tabPorteria');
+      if (tab === 'asistencia') {
+        c.innerHTML = cab + tabs + '<div class="rejilla-2" style="margin-top:0"><section class="tarjeta pila" style="align-items:center;text-align:center">' +
+          '<div><h2>Marca tu asistencia</h2><p class="sub">Escribe tu PIN de 4 números</p></div><div id="puntosAsis">' + puntos(0, 4) + '</div>' +
+          '<div id="msgAsis" class="mensaje-grande" aria-live="assertive" style="width:100%"></div>' + teclado('asis') + '</section>' +
+          '<section class="tarjeta"><div class="tarjeta-cab"><h2>Personal de hoy</h2></div><div id="listaAsis" class="lista">' + cargando() + '</div></section></div>';
+        E.pinAsis = '';
+        E.teclado = { tecla: function (dd) { ACC.asisTecla({ dataset: { d: dd } }); }, borrar: function () { ACC.asisBorrar(); } };
+        cargarAsistencia();
+        return;
+      }
+      var filtro = E.params.filtro || 'dentro';
+      c.innerHTML = cab + tabs +
+        '<div class="resumen-chips"><span class="etiqueta azul">' + d.dentro + ' dentro ahora</span><span class="etiqueta">' + plural(d.total, 'ingreso', 'ingresos') + ' hoy</span><span class="etiqueta">' + plural(d.invitados, 'invitado', 'invitados') + '</span></div>' +
+        '<div class="buscador grande">' + ic('buscar') + '<input id="buscarSocio" class="entrada" type="search" placeholder="DNI, nombre o código del carnet" autocomplete="off" data-in="buscarSocio" aria-label="Buscar socio"></div>' +
+        '<div id="resultados" class="resultados"></div>' +
+        '<section class="tarjeta"><div class="tarjeta-cab"><h2>Ingresos de hoy</h2><div class="chips">' +
+        '<button class="chip ' + (filtro === 'dentro' ? 'activo' : '') + '" data-a="filtroIngresos" data-v="dentro">Dentro ahora</button>' +
+        '<button class="chip ' + (filtro === 'todos' ? 'activo' : '') + '" data-a="filtroIngresos" data-v="todos">Todos</button></div></div>' +
+        '<div class="lista" id="listaIngresos">' + listaIngresos(d.ingresos, filtro) + '</div></section>';
+      var b = $('#buscarSocio');
+      if (b && window.matchMedia('(pointer: fine)').matches) b.focus();
+    });
+  };
+  ACC.tabPorteria = function (el) { ir('porteria', { tab: el.dataset.v }); };
+  ACC.filtroIngresos = function (el) {
+    E.params.filtro = el.dataset.v;
+    document.querySelectorAll('[data-a=filtroIngresos]').forEach(function (b) { b.classList.toggle('activo', b === el); });
+    $('#listaIngresos').innerHTML = listaIngresos(E.datos.porteria.ingresos, el.dataset.v);
+  };
+  function listaIngresos(lista, filtro) {
+    var l = filtro === 'dentro' ? lista.filter(function (i) { return !i.salida; }) : lista;
+    if (!l.length) return vacio('porteria', filtro === 'dentro' ? 'No hay nadie registrado dentro del club.' : 'Todavía no hay ingresos hoy.');
+    return l.slice(0, 120).map(function (i) {
+      var tipo = i.tipo === 'invitado' ? '<span class="etiqueta sol">Invitado</span>' : i.tipo === 'familiar' ? '<span class="etiqueta azul">Familiar</span>' : '';
+      return '<div class="fila"><span class="hora">' + esc(i.hora) + '</span><span class="avatar' + (i.tipo === 'invitado' ? ' sol' : '') + '">' + esc(iniciales(i.nombre)) + '</span>' +
+        '<div class="principal"><div class="nombre">' + esc(i.nombre) + '</div><div class="meta">' + esc(i.detalle) + '</div></div>' +
+        '<span class="ocultar-movil">' + tipo + '</span>' +
+        (i.salida ? '<span class="etiqueta">Salió ' + esc(i.salida) + '</span>' : '<button class="btn btn-sm" data-a="salida" data-id="' + i.id + '">Salida</button>') + '</div>';
+    }).join('');
+  }
+  var buscarTiempo;
+  ENTRADA.buscarSocio = function (el) {
+    clearTimeout(buscarTiempo);
+    var q = el.value.trim();
+    var r = $('#resultados');
+    if (q.length < 2) { r.innerHTML = ''; return; }
+    buscarTiempo = setTimeout(function () {
+      r.innerHTML = '<div class="centro-x"><div class="giro"></div></div>';
+      llamar('buscarSocios', { q: q }).then(function (lista) {
+        if (el.value.trim() !== q) return;
+        E.datos.resultados = lista;
+        r.innerHTML = lista.length ? lista.map(tarjetaSocio).join('') : '<div class="tarjeta">' + vacio('buscar', 'No encontramos a nadie con "' + q + '". Revisa el DNI o el nombre.') + '</div>';
+      }).catch(fallo);
+    }, 280);
+  };
+  function tarjetaSocio(s) {
+    var cu = s.cuenta, bloquear = E.datos.porteria && E.datos.porteria.bloquearMorosos;
+    var notas = '';
+    if (s.estado === 'suspendido') notas += '<div class="nota peligro mt">' + ic('alerta') + '<span>Socio suspendido. No puede entrar; debe pasar por administración.</span></div>';
+    else if (!cu.alDia) notas += '<div class="nota alerta mt">' + ic('alerta') + '<span>Tiene ' + plural(cu.vencidas, 'cuota vencida', 'cuotas vencidas') + ' por ' + soles(cu.deudaVencida) + '. ' + (bloquear ? 'No puede entrar hasta pagar.' : 'Puede entrar; pídele que pase por administración.') + '</span></div>';
+    if (s.dentroDesde) notas += '<div class="nota azul mt">' + ic('info') + '<span>Ya está dentro del club desde las ' + esc(s.dentroDesde) + '.</span></div>';
+    var noPuede = s.dentroDesde || s.estado !== 'activo' || (bloquear && !cu.alDia);
+    var familia = s.familiares.length ? '<div class="familia"><span>Su familia (toca para registrar su ingreso):</span><div class="chips">' + s.familiares.map(function (f) {
+      var dentro = s.familiaresDentro.indexOf(f.nombre) >= 0;
+      return '<button class="chip" data-a="ingresoFamiliar" data-id="' + s.id + '" data-nombre="' + esc(f.nombre) + '"' + (dentro || s.estado !== 'activo' ? ' disabled' : '') + '>' + esc(f.nombre) + ' · ' + esc(f.parentesco) + (dentro ? ' · dentro' : '') + '</button>';
+    }).join('') + '</div></div>' : '';
+    return '<article class="tarjeta"><div class="socio-cab"><span class="avatar grande">' + esc(iniciales(s.nombres + ' ' + s.apellidos)) + '</span>' +
+      '<div class="principal"><div class="nombre-grande">' + esc(s.nombre) + '</div><div class="meta" style="color:var(--gris)">Socio ' + esc(s.codigo) + ' · DNI ' + esc(s.dni) + '</div></div>' + estadoSocio(s) + '</div>' +
+      notas + '<div class="acciones"><button class="btn btn-primario btn-lg" data-a="registrarIngreso" data-id="' + s.id + '"' + (noPuede ? ' disabled' : '') + '>' + ic('check') + 'Registrar ingreso</button>' +
+      '<button class="btn btn-lg" data-a="nuevoInvitado" data-id="' + s.id + '"' + (s.estado !== 'activo' ? ' disabled' : '') + '>' + ic('nuevoSocio') + 'Invitado</button></div>' + familia + '</article>';
+  }
+  function trasIngreso(r, btn) {
+    avisar('Ingreso registrado: ' + r.nombre + ' · ' + r.hora);
+    if (r.aviso) setTimeout(function () { avisar(r.aviso, 'alerta'); }, 1600);
+    var b = $('#buscarSocio'); if (b) { b.value = ''; }
+    $('#resultados').innerHTML = '';
+    refrescarIngresos();
+    if (b && window.matchMedia('(pointer: fine)').matches) b.focus();
+  }
+  function refrescarIngresos() {
+    llamar('porteriaHoy').then(function (d) {
+      E.datos.porteria = d;
+      var l = $('#listaIngresos'); if (l) l.innerHTML = listaIngresos(d.ingresos, E.params.filtro || 'dentro');
+      var rc = document.querySelector('.resumen-chips');
+      if (rc) rc.innerHTML = '<span class="etiqueta azul">' + d.dentro + ' dentro ahora</span><span class="etiqueta">' + plural(d.total, 'ingreso', 'ingresos') + ' hoy</span><span class="etiqueta">' + plural(d.invitados, 'invitado', 'invitados') + '</span>';
+    }).catch(function () { /* se actualiza en la próxima */ });
+  }
+  ACC.registrarIngreso = function (el) {
+    ocupado(el, true);
+    llamar('registrarIngreso', { socio_id: el.dataset.id }).then(function (r) { trasIngreso(r, el); }).catch(function (e) { ocupado(el, false); fallo(e); });
+  };
+  ACC.ingresoFamiliar = function (el) {
+    el.disabled = true;
+    llamar('registrarIngreso', { socio_id: el.dataset.id, familiar: el.dataset.nombre }).then(function (r) { trasIngreso(r, el); }).catch(function (e) { el.disabled = false; fallo(e); });
+  };
+  ACC.salida = function (el) {
+    el.disabled = true;
+    llamar('registrarSalida', { id: el.dataset.id }).then(function () { avisar('Salida registrada.'); refrescarIngresos(); }).catch(function (e) { el.disabled = false; fallo(e); });
+  };
+  ACC.nuevoInvitado = function (el) {
+    var s = (E.datos.resultados || []).find(function (x) { return x.id === el.dataset.id; });
+    var t = E.datos.porteria.tarifas;
+    abrirModal(modalCab('Registrar invitado', 'Invitado de ' + s.nombre + (s.invitadosHoy ? ' · ya trajo ' + s.invitadosHoy + ' hoy' : '')) +
+      '<form class="formulario" data-f="invitado"><input type="hidden" name="socio_id" value="' + s.id + '">' +
+      campo('Nombre y apellido del invitado', entrada('nombre', '', 'autocomplete="off" autofocus')) +
+      campo('DNI del invitado', entrada('dni', '', 'inputmode="numeric" maxlength="8" placeholder="8 números"')) +
+      '<div class="campo"><span>Entra a</span>' + opciones('tarifa', [['club', 'Club · ' + solesCorto(t.club)], ['piscina', 'Piscina · ' + solesCorto(t.piscina)]], 'club') + '</div>' +
+      '<div class="campo"><span>Cómo paga</span>' + opciones('medio', MEDIOS.slice(0, 3), 'efectivo') + '</div>' +
+      '<div class="modal-pie"><button type="button" class="btn" data-a="cerrarModal">Cancelar</button><button type="submit" class="btn btn-primario">' + ic('check') + 'Registrar invitado</button></div></form>');
+  };
+  FORM.invitado = function (f, d, btn) {
+    ocupado(btn, true);
+    llamar('registrarInvitado', d).then(function (r) {
+      cerrarModal();
+      avisar('Invitado registrado: ' + r.nombre + (r.monto ? ' · cobrar ' + soles(r.monto) : ''));
+      $('#resultados').innerHTML = '';
+      var b = $('#buscarSocio'); if (b) b.value = '';
+      refrescarIngresos();
+    }).catch(function (e) { ocupado(btn, false); fallo(e); });
+  };
+
+  // Asistencia del personal
+  function cargarAsistencia() {
+    llamar('asistenciaHoy').then(function (d) {
+      var l = $('#listaAsis');
+      if (!l) return;
+      l.innerHTML = d.personal.map(filaAsistencia).join('') || vacio('personal', 'No hay personal registrado.');
+    }).catch(fallo);
+  }
+  function etiquetaAsistencia(p) {
+    if (p.estado === 'presente') return '<span class="etiqueta ok">Entró ' + esc(p.entrada) + (p.tardanza ? ' · ' + p.tardanza + ' min tarde' : '') + '</span>';
+    if (p.estado === 'salio') return '<span class="etiqueta">Salió ' + esc(p.salida) + '</span>';
+    if (p.estado === 'no_marco') return '<span class="etiqueta peligro">No marcó</span>';
+    return '<span class="etiqueta">Entra ' + esc(p.horario.split(' a ')[0]) + '</span>';
+  }
+  function filaAsistencia(p) {
+    return '<div class="fila"><span class="avatar">' + esc(iniciales(p.nombre)) + '</span><div class="principal"><div class="nombre">' + esc(p.nombre) + '</div><div class="meta">' + esc(p.cargo) + ' · ' + esc(p.horario) + '</div></div>' + etiquetaAsistencia(p) + '</div>';
+  }
+  var enviandoAsis = false, msgAsisTiempo;
+  ACC.asisTecla = function (el) {
+    if (enviandoAsis || E.pinAsis.length >= 4) return;
+    E.pinAsis += el.dataset.d;
+    $('#puntosAsis').innerHTML = puntos(E.pinAsis.length, 4);
+    var msg = $('#msgAsis'); msg.className = 'mensaje-grande'; msg.textContent = '';
+    if (E.pinAsis.length < 4) return;
+    enviandoAsis = true;
+    msg.textContent = 'Revisando…';
+    llamar('marcarAsistencia', { pin: E.pinAsis }).then(function (r) {
+      msg.className = 'mensaje-grande ok';
+      msg.textContent = (r.tipo === 'entrada' ? 'Entrada registrada, ' : 'Salida registrada, ') + r.nombre + ' · ' + r.hora + (r.tardanza ? ' (' + r.tardanza + ' min tarde)' : '');
+      cargarAsistencia();
+    }).catch(function (e) {
+      msg.className = 'mensaje-grande error';
+      msg.textContent = e.message;
+    }).then(function () {
+      enviandoAsis = false; E.pinAsis = '';
+      var p = $('#puntosAsis'); if (p) p.innerHTML = puntos(0, 4);
+      clearTimeout(msgAsisTiempo);
+      msgAsisTiempo = setTimeout(function () { var m = $('#msgAsis'); if (m) { m.className = 'mensaje-grande'; m.textContent = ''; } }, 6000);
+    });
+  };
+  ACC.asisBorrar = function () { if (enviandoAsis) return; E.pinAsis = E.pinAsis.slice(0, -1); $('#puntosAsis').innerHTML = puntos(E.pinAsis.length, 4); };
+
+  // ================= SOCIOS =================
+  VISTAS.socios = function (c, n) {
+    return llamar('listarSocios').then(function (d) {
+      if (!vigente(n)) return;
+      E.datos.socios = d;
+      var admin = E.perfil.rol === 'admin';
+      var filtro = E.params.filtro || 'todos';
+      var acc = admin ? '<button class="btn btn-primario" data-a="nuevoSocio">' + ic('nuevoSocio') + 'Nuevo socio</button>' +
+        (!d.cuotasDelMesCreadas ? '<button class="btn" data-a="generarCuotas">' + ic('recargar') + 'Generar cuotas de ' + esc(d.periodoLegible.split(' ')[0]) + '</button>' : '') : '';
+      c.innerHTML = cabecera('Socios', d.total + ' socios · ' + d.alDia + ' al día · ' + soles(d.deuda) + ' en cuotas vencidas', acc) +
+        '<div class="herramientas"><div class="buscador">' + ic('buscar') + '<input class="entrada" type="search" placeholder="Buscar por nombre, DNI o código" data-in="filtrarSocios" id="filtroSocios" aria-label="Buscar socio"></div>' +
+        '<div class="chips desliza">' + [['todos', 'Todos'], ['aldia', 'Al día'], ['deuda', 'Con deuda'], ['suspendidos', 'Suspendidos']].map(function (o) {
+          return '<button class="chip ' + (filtro === o[0] ? 'activo' : '') + '" data-a="filtroSocios" data-v="' + o[0] + '">' + o[1] + '</button>';
+        }).join('') + '</div></div>' +
+        '<section class="tarjeta" style="padding:12px"><div class="lista" id="listaSocios"></div></section>';
+      pintarSocios();
+    });
+  };
+  function pintarSocios() {
+    var d = E.datos.socios, q = ($('#filtroSocios') || {}).value || '', filtro = E.params.filtro || 'todos';
+    var nq = q.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+    var lista = d.socios.filter(function (s) {
+      if (filtro === 'aldia' && (!s.cuenta.alDia || s.estado !== 'activo')) return false;
+      if (filtro === 'deuda' && s.cuenta.alDia) return false;
+      if (filtro === 'suspendidos' && s.estado !== 'suspendido') return false;
+      if (!nq) return true;
+      var t = (s.nombre + ' ' + s.dni + ' ' + s.codigo).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+      return nq.split(/\s+/).every(function (p) { return t.indexOf(p) >= 0; });
+    });
+    if (filtro === 'deuda') lista.sort(function (a, b) { return b.cuenta.deudaVencida - a.cuenta.deudaVencida; });
+    $('#listaSocios').innerHTML = lista.length ? lista.map(function (s) {
+      return '<div class="fila boton" data-a="ir" data-v="socio" data-id="' + s.id + '"><span class="avatar">' + esc(iniciales(s.nombres + ' ' + s.apellidos)) + '</span>' +
+        '<div class="principal"><div class="nombre">' + esc(s.apellidos + ', ' + s.nombres) + '</div><div class="meta">' + esc(s.codigo) + ' · DNI ' + esc(s.dni) + (s.celular ? ' · ' + esc(s.celular) : '') + '</div></div>' +
+        (s.cuenta.deudaVencida > 0 ? '<span class="monto ocultar-movil" style="color:var(--alerta)">' + soles(s.cuenta.deudaVencida) + '</span>' : '') +
+        estadoSocio(s) + ic('derecha') + '</div>';
+    }).join('') : vacio('socios', 'No hay socios con ese filtro.');
+  }
+  ENTRADA.filtrarSocios = function () { pintarSocios(); };
+  ACC.filtroSocios = function (el) {
+    E.params.filtro = el.dataset.v;
+    document.querySelectorAll('[data-a=filtroSocios]').forEach(function (b) { b.classList.toggle('activo', b === el); });
+    pintarSocios();
+  };
+  ACC.generarCuotas = function (el) {
+    var d = E.datos.socios;
+    confirmar('Generar cuotas de ' + d.periodoLegible, 'Se creará la cuota de ' + soles(d.cuota) + ' para cada socio activo. Vence el día ' + 10 + ' del mes siguiente.', 'Generar cuotas').then(function () {
+      llamar('generarCuotas', { periodo: d.periodo }).then(function (r) { avisar(plural(r.creadas, 'cuota creada', 'cuotas creadas') + ' para ' + r.mes + '.'); pintarVista(); }).catch(fallo);
+    });
+  };
+
+  function formSocio(s) {
+    s = s || {};
+    var fam = (s.familiares || []).map(function (f) { return f.nombre + ', ' + f.parentesco; }).join('\n');
+    return '<form class="formulario" data-f="socio">' + (s.id ? '<input type="hidden" name="id" value="' + s.id + '">' : '') +
+      '<div class="dos">' + campo('Nombres', entrada('nombres', s.nombres, 'autofocus autocomplete="off"')) + campo('Apellidos', entrada('apellidos', s.apellidos, 'autocomplete="off"')) + '</div>' +
+      '<div class="dos">' + campo('DNI', entrada('dni', s.dni, 'inputmode="numeric" maxlength="8"')) + campo('Celular', entrada('celular', s.celular, 'inputmode="tel" maxlength="9" placeholder="9 números"')) + '</div>' +
+      '<div class="dos">' + campo('Correo (opcional)', entrada('correo', s.correo, 'type="email" autocomplete="off"')) + campo('Fecha de nacimiento', entrada('fecha_nacimiento', s.fecha_nacimiento, 'type="date"')) + '</div>' +
+      campo('Familia que puede entrar con su carnet', '<textarea class="entrada" name="familiares" placeholder="Una persona por línea, por ejemplo:&#10;Ana Torres, esposa&#10;Lucía Peralta, hija">' + esc(fam) + '</textarea>', 'Escribe el nombre, una coma y el parentesco.') +
+      '<div class="modal-pie"><button type="button" class="btn" data-a="cerrarModal">Cancelar</button><button type="submit" class="btn btn-primario">' + ic('check') + (s.id ? 'Guardar cambios' : 'Registrar socio') + '</button></div></form>';
+  }
+  ACC.nuevoSocio = function () { abrirModal(modalCab('Nuevo socio', 'Al terminar se crea su cuota del mes y un PIN temporal.') + formSocio()); };
+  FORM.socio = function (f, d, btn) {
+    ocupado(btn, true);
+    llamar('guardarSocio', d).then(function (r) {
+      if (d.id) { cerrarModal(); avisar('Datos del socio guardados.'); pintarVista(); return; }
+      abrirModal(modalCab('Socio registrado', 'Código ' + r.codigo) +
+        '<div class="nota ok">' + ic('ok') + '<span>Su PIN temporal es <b class="num" style="font-size:20px">' + esc(r.pin) + '</b> (los últimos 6 números de su DNI). La primera vez que entre a la app creará su propio PIN.</span></div>' +
+        '<div class="modal-pie mt-l"><button class="btn btn-primario" data-a="ir" data-v="socio" data-id="' + r.id + '">Ver ficha del socio</button></div>');
+    }).catch(function (e) { ocupado(btn, false); fallo(e); });
+  };
+
+  VISTAS.socio = function (c, n) {
+    return llamar('verSocio', { id: E.params.id }).then(function (s) {
+      if (!vigente(n)) return;
+      E.datos.socio = s;
+      var admin = E.perfil.rol === 'admin';
+      var pendientes = s.cuotas.filter(function (q) { return q.estado !== 'pagada'; });
+      var acc = admin ? '<button class="btn btn-primario" data-a="pagoSocio"' + (pendientes.length ? '' : ' disabled') + '>' + ic('dinero') + 'Registrar pago</button>' +
+        '<button class="btn" data-a="editarSocio">' + ic('editar') + 'Editar</button>' +
+        '<button class="btn" data-a="pinSocio">' + ic('llave') + 'Reiniciar PIN</button>' +
+        '<button class="btn ' + (s.estado === 'activo' ? 'btn-peligro' : '') + '" data-a="estadoSocio">' + (s.estado === 'activo' ? 'Suspender' : 'Activar') + '</button>' : '';
+      var cu = s.cuenta;
+      var meses = s.cuotas.slice(0, 12).reverse().map(function (q) {
+        return '<div class="mes ' + q.estado + '"><b>' + esc(q.mes.split(' ')[0]) + '</b>' + (q.estado === 'pagada' ? 'Pagada' : q.estado === 'vencida' ? 'Vencida' : 'Por pagar') + '</div>';
+      }).join('');
+      var fam = s.familiares.length ? s.familiares.map(function (f) { return '<div class="fila"><span class="avatar">' + esc(iniciales(f.nombre)) + '</span><div class="principal"><div class="nombre">' + esc(f.nombre) + '</div><div class="meta">' + esc(f.parentesco) + '</div></div></div>'; }).join('') : '<p class="sub">No tiene familiares registrados.</p>';
+      var pagos = s.pagos.length ? s.pagos.map(function (p) {
+        return '<div class="fila"><span class="icono-circulo ok">' + ic('dinero') + '</span><div class="principal"><div class="nombre">' + esc(p.periodos.join(', ')) + '</div><div class="meta">' + fechaMedia(p.fecha) + ' · ' + esc(p.medio) + '</div></div><span class="monto">' + soles(p.monto) + '</span></div>';
+      }).join('') : vacio('dinero', 'Todavía no hay pagos registrados.');
+      var ings = s.ingresos.length ? s.ingresos.map(function (i) {
+        return '<div class="fila"><span class="icono-circulo">' + ic('porteria') + '</span><div class="principal"><div class="nombre">' + esc(i.tipo === 'socio' ? 'Ingresó el socio' : (i.tipo === 'familiar' ? 'Familiar: ' : 'Invitado: ') + i.nombre) + '</div><div class="meta">' + fechaMedia(i.fecha) + ' · ' + esc(i.hora) + '</div></div></div>';
+      }).join('') : vacio('porteria', 'No hay ingresos registrados.');
+      c.innerHTML = '<button class="btn btn-sm volver" data-a="ir" data-v="socios">' + ic('atras') + 'Socios</button>' +
+        '<header class="cabecera"><div class="avatar xl">' + esc(iniciales(s.nombres + ' ' + s.apellidos)) + '</div><h1>' + esc(s.nombre) + '</h1>' +
+        '<p class="sub">Socio ' + esc(s.codigo) + (s.fecha_ingreso ? ' · desde ' + esc(s.fecha_ingreso.slice(0, 4)) : '') + '</p>' +
+        '<div class="etiquetas mt">' + estadoSocio(s) + (s.ejemplo ? '<span class="etiqueta sol">Dato de ejemplo</span>' : '') + (s.debeCambiarPin ? '<span class="etiqueta">Aún no crea su PIN</span>' : '') + '</div>' +
+        (acc ? '<div class="acciones-cabecera">' + acc + '</div>' : '') + '</header>' +
+        '<div class="rejilla-2"><section class="tarjeta"><h2>Estado de cuenta</h2>' +
+        (cu.alDia ? '<div class="grande-num" style="color:var(--ok)">Al día</div><p class="sub">' + (cu.porPagar ? 'Por pagar ' + soles(cu.porPagar) + (cu.proximaVence ? ', vence el ' + fechaLarga(cu.proximaVence) : '') : 'No tiene cuotas pendientes') + '</p>'
+          : '<div class="grande-num" style="color:var(--peligro)">' + soles(cu.deudaVencida) + '</div><p class="sub">' + plural(cu.vencidas, 'cuota vencida', 'cuotas vencidas') + (cu.porPagar > cu.deudaVencida ? ' · total por pagar ' + soles(cu.porPagar) : '') + '</p>') +
+        '<div class="meses">' + meses + '</div></section>' +
+        '<section class="tarjeta"><h2>Datos</h2><dl class="datos"><dt>DNI</dt><dd class="num">' + esc(s.dni) + '</dd><dt>Celular</dt><dd class="num">' + esc(s.celular || '—') + '</dd><dt>Correo</dt><dd>' + esc(s.correo || '—') + '</dd>' +
+        '<dt>Nacimiento</dt><dd>' + (s.fecha_nacimiento ? esc(fechaCorta(s.fecha_nacimiento) + ' ' + s.fecha_nacimiento.slice(0, 4)) : '—') + '</dd></dl>' +
+        '<h2 class="mt-l">Familia</h2><div class="lista">' + fam + '</div></section></div>' +
+        '<div class="rejilla-2"><section class="tarjeta"><h2>Pagos</h2><div class="lista mt">' + pagos + '</div></section>' +
+        '<section class="tarjeta"><h2>Últimos ingresos al club</h2><div class="lista mt">' + ings + '</div></section></div>';
+    });
+  };
+  ACC.editarSocio = function () { abrirModal(modalCab('Editar socio', E.datos.socio.nombre) + formSocio(E.datos.socio)); };
+  ACC.pinSocio = function () {
+    var s = E.datos.socio;
+    confirmar('Reiniciar el PIN', 'El PIN de ' + s.nombre + ' volverá a ser los últimos 6 números de su DNI. Al entrar tendrá que crear uno nuevo.', 'Reiniciar PIN').then(function () {
+      llamar('reiniciarPinSocio', { id: s.id }).then(function (r) { avisar('PIN temporal: ' + r.pin); pintarVista(); }).catch(fallo);
+    });
+  };
+  ACC.estadoSocio = function () {
+    var s = E.datos.socio, nuevo = s.estado === 'activo' ? 'suspendido' : 'activo';
+    confirmar(nuevo === 'suspendido' ? 'Suspender socio' : 'Activar socio', nuevo === 'suspendido' ? 'Mientras esté suspendido no podrá entrar al club ni reservar.' : 'Podrá volver a entrar al club y reservar.', nuevo === 'suspendido' ? 'Suspender' : 'Activar', nuevo === 'suspendido').then(function () {
+      llamar('cambiarEstadoSocio', { id: s.id, estado: nuevo }).then(function () { avisar(nuevo === 'suspendido' ? 'Socio suspendido.' : 'Socio activo otra vez.'); pintarVista(); }).catch(fallo);
+    });
+  };
+  ACC.pagoSocio = function () {
+    var s = E.datos.socio;
+    var pend = s.cuotas.filter(function (q) { return q.estado !== 'pagada'; }).slice().reverse();
+    var hayVencidas = pend.some(function (q) { return q.estado === 'vencida'; });
+    abrirModal(modalCab('Registrar pago', s.nombre) + '<form class="formulario" data-f="pago"><input type="hidden" name="socio_id" value="' + s.id + '">' +
+      '<div class="campo"><span>Cuotas que paga</span><div class="pila" style="gap:8px">' + pend.map(function (q, i) {
+        var marcar = hayVencidas ? q.estado === 'vencida' : i === 0;
+        return '<label class="cuota-elegir"><input type="checkbox" name="cuota_' + q.id + '" value="' + q.id + '" data-monto="' + q.monto + '"' + (marcar ? ' checked' : '') + '>' +
+          '<div class="principal"><div class="nombre">' + esc(q.mes) + '</div><div class="meta">' + (q.estado === 'vencida' ? 'Vencida el ' : 'Vence el ') + fechaCorta(q.vence) + '</div></div><span class="monto">' + soles(q.monto) + '</span></label>';
+      }).join('') + '</div></div>' +
+      '<div class="campo"><span>Cómo pagó</span>' + opciones('medio', MEDIOS, 'efectivo') + '</div>' +
+      campo('Nota (opcional)', entrada('nota', '', 'placeholder="Por ejemplo: N° de operación"')) +
+      '<div class="total"><span>Total</span><b id="totalPago">S/ 0.00</b></div>' +
+      '<div class="modal-pie"><button type="button" class="btn" data-a="cerrarModal">Cancelar</button><button type="submit" class="btn btn-primario">' + ic('check') + 'Registrar pago</button></div></form>',
+      function (m) {
+        var calc = function () {
+          var t = 0; m.querySelectorAll('input[type=checkbox]:checked').forEach(function (x) { t += Number(x.dataset.monto); });
+          $('#totalPago', m).textContent = soles(t);
+        };
+        m.addEventListener('change', calc); calc();
+      });
+  };
+  FORM.pago = function (f, d, btn) {
+    var cuotas = Array.prototype.map.call(f.querySelectorAll('input[type=checkbox]:checked'), function (x) { return x.value; });
+    ocupado(btn, true);
+    llamar('registrarPago', { socio_id: d.socio_id, cuotas: cuotas, medio: d.medio, nota: d.nota }).then(function (r) {
+      cerrarModal(); avisar('Pago registrado: ' + soles(r.total) + ' (' + r.meses.join(', ') + ')'); pintarVista();
+    }).catch(function (e) { ocupado(btn, false); fallo(e); });
+  };
+
+  // ================= BARRA =================
+  VISTAS.barra = function (c, n) {
+    var tab = E.params.tab || 'vender';
+    return llamar('barraHoy').then(function (d) {
+      if (!vigente(n)) return;
+      E.datos.barra = d;
+      var sub = tab === 'vender' ? 'Toca los productos para armar el pedido' : tab === 'ventas' ? plural(d.cantidad, 'venta', 'ventas') + ' hoy · ' + soles(d.total) : 'Revisa lo que queda y registra la mercadería que llega';
+      var html = cabecera('Barra', sub) + pestanas([['vender', 'Vender'], ['ventas', 'Ventas de hoy'], ['stock', 'Stock']], tab, 'tabBarra');
+      if (tab === 'vender') {
+        var cat = E.params.cat || 'Todo';
+        html += '<div class="venta"><div><div class="chips desliza">' + ['Todo'].concat(d.categorias).map(function (k) {
+          return '<button class="chip ' + (k === cat ? 'activo' : '') + '" data-a="catBarra" data-v="' + esc(k) + '">' + esc(k) + '</button>';
+        }).join('') + '</div><div class="productos" id="productos"></div></div>' +
+          '<aside class="tarjeta ticket" id="ticket"></aside></div><div class="pedido-movil" id="pedidoMovil" hidden></div>';
+        c.innerHTML = html;
+        pintarProductos(); pintarTicket();
+      } else if (tab === 'ventas') {
+        html += '<section class="cifras">' + cifra('barra', 'Vendido hoy', soles(d.total), plural(d.cantidad, 'venta', 'ventas')) +
+          d.porMedio.map(function (m) { return cifra('dinero', m.medio, soles(m.total), ''); }).join('') + '</section>' +
+          '<section class="tarjeta mt"><div class="lista">' + (d.ventas.length ? d.ventas.map(function (v) {
+            var resumen = v.items.map(function (i) { return i.cant + '× ' + i.nombre; }).join(', ');
+            return '<div class="fila"><span class="hora">' + esc(v.hora) + '</span><div class="principal"><div class="nombre">N° ' + v.numero + (v.mesa ? ' · mesa ' + esc(v.mesa) : '') + '</div><div class="meta">' + esc(resumen) + '</div></div>' +
+              '<span class="etiqueta ocultar-movil">' + esc(v.medio) + '</span>' +
+              (v.estado === 'anulada' ? '<span class="etiqueta peligro">Anulada</span>' : '<span class="monto">' + soles(v.total) + '</span>') +
+              (d.puedeAnular && v.estado !== 'anulada' ? '<button class="btn btn-sm btn-icono btn-plano" data-a="anularVenta" data-id="' + v.id + '" aria-label="Anular venta ' + v.numero + '" title="Anular">' + ic('anular') + '</button>' : '') + '</div>';
+          }).join('') : vacio('barra', 'Todavía no hay ventas hoy.')) + '</div></section>';
+        c.innerHTML = html;
+      } else {
+        html += '<div class="herramientas"><div class="buscador">' + ic('buscar') + '<input class="entrada" type="search" placeholder="Buscar producto" data-in="filtrarStock" id="filtroStock" aria-label="Buscar producto"></div></div>' +
+          '<section class="tarjeta" style="padding:12px"><div class="lista" id="listaStock"></div></section>';
+        c.innerHTML = html;
+        pintarStock();
+      }
+    });
+  };
+  ACC.tabBarra = function (el) { ir('barra', { tab: el.dataset.v }); };
+  ACC.catBarra = function (el) {
+    E.params.cat = el.dataset.v;
+    document.querySelectorAll('[data-a=catBarra]').forEach(function (b) { b.classList.toggle('activo', b === el); });
+    pintarProductos();
+  };
+  function pintarProductos() {
+    var d = E.datos.barra, cat = E.params.cat || 'Todo';
+    var lista = d.productos.filter(function (p) { return p.activo && (cat === 'Todo' || p.categoria === cat); });
+    $('#productos').innerHTML = lista.map(function (p) {
+      var enPedido = E.pedido[p.id] || 0;
+      var agotado = p.controla && p.stock <= 0;
+      var stock = p.controla ? '<span class="stock' + (p.stock <= p.minimo ? ' poco' : '') + '">' + (agotado ? 'Agotado' : 'Quedan ' + p.stock) + '</span>' : '';
+      return '<button class="producto' + (enPedido ? ' en-pedido' : '') + '" data-a="agregar" data-id="' + p.id + '"' + (agotado ? ' disabled' : '') + '>' +
+        (enPedido ? '<span class="cuenta">' + enPedido + '</span>' : '') +
+        '<div><div class="nom">' + esc(p.nombre) + '</div>' + (p.detalle ? '<div class="det">' + esc(p.detalle) + '</div>' : '') + '</div>' +
+        '<div class="pie"><span class="precio">' + soles(p.precio) + '</span>' + stock + '</div></button>';
+    }).join('') || vacio('barra', 'No hay productos en esta categoría.');
+  }
+  function lineasPedido() {
+    var d = E.datos.barra;
+    return Object.keys(E.pedido).map(function (id) {
+      var p = d.productos.find(function (x) { return x.id === id; });
+      return p ? { p: p, cant: E.pedido[id] } : null;
+    }).filter(Boolean);
+  }
+  function pintarTicket() {
+    var l = lineasPedido();
+    var total = l.reduce(function (a, x) { return a + x.p.precio * x.cant; }, 0);
+    var cuantos = l.reduce(function (a, x) { return a + x.cant; }, 0);
+    var medio = E.medioBarra || 'efectivo';
+    $('#ticket').innerHTML = '<div class="tarjeta-cab" style="margin-bottom:0"><h2>Pedido</h2>' + (l.length ? '<button class="btn btn-sm btn-plano" data-a="vaciarPedido">Vaciar</button>' : '') + '</div>' +
+      (l.length ? '<div class="ticket-items">' + l.map(function (x) {
+        return '<div class="ticket-item"><div class="principal"><div class="nombre">' + esc(x.p.nombre) + '</div><div class="meta">' + soles(x.p.precio) + ' c/u</div></div>' +
+          '<div class="cantidad"><button data-a="menos" data-id="' + x.p.id + '" aria-label="Quitar uno">' + ic('menos') + '</button><b>' + x.cant + '</b><button data-a="agregar" data-id="' + x.p.id + '" aria-label="Agregar uno">' + ic('mas') + '</button></div></div>';
+      }).join('') + '</div>' : '<p class="sub" style="padding:18px 0">Toca un producto para agregarlo.</p>') +
+      '<div class="total"><span>Total</span><b>' + soles(total) + '</b></div>' +
+      '<div class="pila" style="gap:12px">' + campo('Mesa (opcional)', '<input class="entrada" id="mesaBarra" inputmode="numeric" maxlength="6" value="' + esc(E.mesaBarra || '') + '" data-in="mesaBarra">') +
+      '<div class="campo"><span>Cómo paga</span><div class="opciones">' + MEDIOS.slice(0, 4).map(function (m) {
+        return '<label class="opcion"><input type="radio" name="medioBarra" value="' + m[0] + '"' + (m[0] === medio ? ' checked' : '') + ' data-in="medioBarra"><span>' + m[1] + '</span></label>';
+      }).join('') + '</div></div>' +
+      '<button class="btn btn-primario btn-lg btn-bloque" data-a="cobrar"' + (l.length ? '' : ' disabled') + '>' + ic('check') + 'Cobrar ' + soles(total) + '</button></div>';
+    var pm = $('#pedidoMovil');
+    if (pm) {
+      pm.hidden = !l.length;
+      pm.innerHTML = '<span>' + plural(cuantos, 'producto', 'productos') + ' · <b>' + soles(total) + '</b></span><button class="btn btn-primario" data-a="verPedido">Ver pedido</button>';
+    }
+  }
+  ENTRADA.mesaBarra = function (el) { E.mesaBarra = el.value; };
+  ENTRADA.medioBarra = function (el) { E.medioBarra = el.value; };
+  ACC.verPedido = function () { $('#ticket').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+  ACC.agregar = function (el) {
+    var id = el.dataset.id;
+    var p = E.datos.barra.productos.find(function (x) { return x.id === id; });
+    var actual = E.pedido[id] || 0;
+    if (p.controla && actual + 1 > p.stock) { avisar('Solo quedan ' + p.stock + ' de ' + p.nombre + '.', 'alerta'); return; }
+    E.pedido[id] = actual + 1;
+    pintarProductos(); pintarTicket();
+  };
+  ACC.menos = function (el) {
+    var id = el.dataset.id;
+    E.pedido[id] = (E.pedido[id] || 0) - 1;
+    if (E.pedido[id] <= 0) delete E.pedido[id];
+    pintarProductos(); pintarTicket();
+  };
+  ACC.vaciarPedido = function () { E.pedido = {}; pintarProductos(); pintarTicket(); };
+  ACC.cobrar = function (el) {
+    var items = lineasPedido().map(function (x) { return { id: x.p.id, cant: x.cant }; });
+    var medio = (document.querySelector('input[name=medioBarra]:checked') || {}).value || 'efectivo';
+    ocupado(el, true);
+    llamar('registrarVenta', { items: items, medio: medio, mesa: ($('#mesaBarra') || {}).value || '' }).then(function (r) {
+      E.pedido = {}; E.mesaBarra = '';
+      avisar('Venta N° ' + r.numero + ' cobrada: ' + soles(r.total));
+      return llamar('barraHoy').then(function (d) { E.datos.barra = d; pintarProductos(); pintarTicket(); });
+    }).catch(function (e) { ocupado(el, false); fallo(e); });
+  };
+  ACC.anularVenta = function (el) {
+    abrirModal(modalCab('Anular venta', 'El dinero sale de caja y el stock vuelve a la barra.') +
+      '<form class="formulario" data-f="anular"><input type="hidden" name="id" value="' + el.dataset.id + '">' + campo('Motivo', entrada('motivo', '', 'autofocus placeholder="Por ejemplo: se cobró dos veces"')) +
+      '<div class="modal-pie"><button type="button" class="btn" data-a="cerrarModal">Volver</button><button type="submit" class="btn btn-peligro-lleno">Anular venta</button></div></form>');
+  };
+  FORM.anular = function (f, d, btn) {
+    ocupado(btn, true);
+    llamar('anularVenta', d).then(function () { cerrarModal(); avisar('Venta anulada.'); pintarVista(); }).catch(function (e) { ocupado(btn, false); fallo(e); });
+  };
+  function pintarStock() {
+    var d = E.datos.barra, q = (($('#filtroStock') || {}).value || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    var admin = E.perfil.rol === 'admin';
+    var lista = d.productos.filter(function (p) { return !q || p.nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').indexOf(q) >= 0; })
+      .sort(function (a, b) { return (a.controla && a.stock <= a.minimo ? 0 : 1) - (b.controla && b.stock <= b.minimo ? 0 : 1); });
+    $('#listaStock').innerHTML = lista.map(function (p) {
+      var et = !p.controla ? '<span class="etiqueta">Se prepara en barra</span>' : p.stock <= 0 ? '<span class="etiqueta peligro">Agotado</span>' : p.stock <= p.minimo ? '<span class="etiqueta alerta">Poco: ' + p.stock + '</span>' : '<span class="etiqueta ok">' + p.stock + ' en stock</span>';
+      return '<div class="fila"><div class="principal"><div class="nombre">' + esc(p.nombre) + (p.activo ? '' : ' (oculto)') + '</div><div class="meta">' + esc(p.categoria) + ' · ' + soles(p.precio) + (p.controla ? ' · mínimo ' + p.minimo : '') + (p.porConfirmar ? ' · precio por confirmar' : '') + '</div></div>' + et +
+        '<button class="btn btn-sm" data-a="ingresarStock" data-id="' + p.id + '">' + ic('mas') + '<span class="ocultar-movil">Ingresar</span></button>' +
+        (admin ? '<button class="btn btn-sm btn-icono btn-plano" data-a="editarProducto" data-id="' + p.id + '" aria-label="Editar ' + esc(p.nombre) + '">' + ic('editar') + '</button>' : '') + '</div>';
+    }).join('') || vacio('paquete', 'No hay productos con ese nombre.');
+  }
+  ENTRADA.filtrarStock = function () { pintarStock(); };
+  ACC.ingresarStock = function (el) {
+    var p = E.datos.barra.productos.find(function (x) { return x.id === el.dataset.id; });
+    abrirModal(modalCab('Ingresar mercadería', p.nombre + (p.controla ? ' · hoy hay ' + p.stock : '')) +
+      '<form class="formulario" data-f="stock"><input type="hidden" name="id" value="' + p.id + '">' + campo('¿Cuántas unidades llegaron?', entrada('cantidad', '', 'type="number" min="1" max="999" inputmode="numeric" autofocus')) +
+      '<div class="modal-pie"><button type="button" class="btn" data-a="cerrarModal">Cancelar</button><button type="submit" class="btn btn-primario">' + ic('check') + 'Guardar</button></div></form>');
+  };
+  FORM.stock = function (f, d, btn) {
+    ocupado(btn, true);
+    llamar('ingresarStock', d).then(function () { cerrarModal(); avisar('Stock actualizado.'); pintarVista(); }).catch(function (e) { ocupado(btn, false); fallo(e); });
+  };
+  ACC.editarProducto = function (el) {
+    var p = E.datos.barra.productos.find(function (x) { return x.id === el.dataset.id; });
+    abrirModal(modalCab('Editar producto', p.nombre) + '<form class="formulario" data-f="producto"><input type="hidden" name="id" value="' + p.id + '">' +
+      campo('Precio (S/)', entrada('precio', p.precio, 'type="number" step="0.5" min="0" inputmode="decimal"')) +
+      '<div class="campo"><span>Control de stock</span>' + opciones('controla', [['si', 'Se cuenta por unidad'], ['no', 'Se prepara en barra']], p.controla ? 'si' : 'no') + '</div>' +
+      campo('Avisar cuando queden', entrada('minimo', p.controla ? p.minimo : 0, 'type="number" min="0" inputmode="numeric"')) +
+      '<div class="campo"><span>En la carta</span>' + opciones('activo', [['si', 'Visible'], ['no', 'Oculto']], p.activo ? 'si' : 'no') + '</div>' +
+      '<div class="modal-pie"><button type="button" class="btn" data-a="cerrarModal">Cancelar</button><button type="submit" class="btn btn-primario">' + ic('check') + 'Guardar</button></div></form>');
+  };
+  FORM.producto = function (f, d, btn) {
+    ocupado(btn, true);
+    llamar('guardarProducto', { id: d.id, precio: d.precio, controla: d.controla === 'si', minimo: d.minimo, activo: d.activo === 'si' }).then(function () { cerrarModal(); avisar('Producto guardado.'); pintarVista(); }).catch(function (e) { ocupado(btn, false); fallo(e); });
+  };
+
+  // ================= CAJA =================
+  VISTAS.caja = function (c, n) {
+    return llamar('cajaDia', { fecha: E.params.fecha }).then(function (d) {
+      if (!vigente(n)) return;
+      var admin = E.perfil.rol === 'admin', esHoy = d.fecha === d.hoy;
+      var acc = admin && esHoy ? '<button class="btn btn-primario" data-a="movimiento">' + ic('mas') + 'Nuevo movimiento</button><button class="btn" data-a="cerrarCaja" data-esperado="' + d.efectivo + '">' + ic('check') + 'Cerrar caja</button>' : '';
+      var nav = '<div class="centro-x mb"><div class="chips"><button class="chip" data-a="diaCaja" data-v="' + sumarDias(d.fecha, -1) + '">' + ic('izquierda') + 'Día anterior</button>' +
+        '<button class="chip activo">' + esc(diaRelativo(d.fecha, d.hoy)) + '</button>' +
+        '<button class="chip" data-a="diaCaja" data-v="' + sumarDias(d.fecha, 1) + '"' + (esHoy ? ' disabled' : '') + '>Día siguiente' + ic('derecha') + '</button></div></div>';
+      var cierre = d.cierre ? '<div class="nota ' + (Math.abs(d.cierre.diferencia) < 0.5 ? 'ok' : 'alerta') + ' mb">' + ic('check') + '<span>Caja cerrada a las ' + esc(d.cierre.hora) + ' por ' + esc(d.cierre.registrado_por) + ': se esperaba ' + soles(d.cierre.esperado) + ' en efectivo y se contó ' + soles(d.cierre.contado) + (Math.abs(d.cierre.diferencia) < 0.5 ? '. Cuadra.' : ' (diferencia ' + soles(d.cierre.diferencia) + ').') + '</span></div>' : '';
+      c.innerHTML = cabecera('Caja', fechaLarga(d.fecha).replace(/^./, function (x) { return x.toUpperCase(); }), acc) + nav + cierre +
+        '<section class="cifras">' + cifra('mas', 'Entró', soles(d.ingresos), 'Cuotas, barra, invitados y alquileres') + cifra('menos', 'Salió', soles(d.egresos), 'Gastos y anulaciones') +
+        cifra('caja', 'Saldo del día', soles(d.saldo), 'Entró menos salió') + cifra('dinero', 'Efectivo en caja', soles(d.efectivo), 'Lo que debería haber en billetes') + '</section>' +
+        '<div class="rejilla-2"><section class="tarjeta"><h2>Por concepto</h2><div class="lista mt">' + d.porOrigen.map(function (o) {
+          return '<div class="fila"><div class="principal"><div class="nombre">' + esc(o.origen) + '</div>' + (o.egresos ? '<div class="meta">Salió ' + soles(o.egresos) + '</div>' : '') + '</div><span class="monto">' + soles(o.ingresos) + '</span></div>';
+        }).join('') + '</div></section>' +
+        '<section class="tarjeta"><h2>Por medio de pago</h2><div class="lista mt">' + (d.porMedio.length ? d.porMedio.map(function (m) {
+          return '<div class="fila"><div class="principal"><div class="nombre">' + esc(m.medio) + '</div></div><span class="monto">' + soles(m.total) + '</span></div>';
+        }).join('') : vacio('dinero', 'Sin movimientos.')) + '</div></section></div>' +
+        '<section class="tarjeta mt"><div class="tarjeta-cab"><h2>Movimientos</h2><p>' + plural(d.movimientos.length, 'movimiento', 'movimientos') + '</p></div><div class="lista">' + (d.movimientos.length ? d.movimientos.map(function (m) {
+          return '<div class="fila"><span class="hora">' + esc(m.hora) + '</span><div class="principal"><div class="nombre">' + esc(m.concepto) + '</div><div class="meta">' + esc(m.origen) + ' · ' + esc(m.medio) + ' · ' + esc(m.por) + '</div></div>' +
+            '<span class="monto" style="color:' + (m.tipo === 'egreso' ? 'var(--peligro)' : 'var(--tinta)') + '">' + (m.tipo === 'egreso' ? '− ' : '') + soles(m.monto) + '</span></div>';
+        }).join('') : vacio('caja', 'No hay movimientos este día.')) + '</div></section>';
+    });
+  };
+  ACC.diaCaja = function (el) { ir('caja', { fecha: el.dataset.v }); };
+  ACC.movimiento = function () {
+    abrirModal(modalCab('Nuevo movimiento de caja') + '<form class="formulario" data-f="movimiento">' +
+      '<div class="campo"><span>Tipo</span>' + opciones('tipo', [['egreso', 'Sale dinero (gasto)'], ['ingreso', 'Entra dinero']], 'egreso') + '</div>' +
+      campo('Concepto', entrada('concepto', '', 'autofocus placeholder="Por ejemplo: compra de hielo"')) +
+      '<div class="dos">' + campo('Monto (S/)', entrada('monto', '', 'type="number" step="0.1" min="0" inputmode="decimal"')) +
+      '<label class="campo"><span>Tipo de gasto o ingreso</span><select class="entrada" name="origen"><option value="otros">Otros</option><option value="barra">Barra</option><option value="cuotas">Cuotas</option><option value="invitados">Invitados</option><option value="alquileres">Alquileres</option></select></label></div>' +
+      '<div class="campo"><span>Medio</span>' + opciones('medio', MEDIOS, 'efectivo') + '</div>' +
+      '<div class="modal-pie"><button type="button" class="btn" data-a="cerrarModal">Cancelar</button><button type="submit" class="btn btn-primario">' + ic('check') + 'Guardar</button></div></form>');
+  };
+  FORM.movimiento = function (f, d, btn) {
+    ocupado(btn, true);
+    llamar('registrarMovimiento', d).then(function () { cerrarModal(); avisar('Movimiento guardado.'); pintarVista(); }).catch(function (e) { ocupado(btn, false); fallo(e); });
+  };
+  ACC.cerrarCaja = function (el) {
+    abrirModal(modalCab('Cerrar caja de hoy', 'Cuenta los billetes y monedas y escribe el total.') + '<form class="formulario" data-f="cierre">' +
+      '<div class="nota azul">' + ic('info') + '<span>Según el sistema debería haber <b>' + soles(el.dataset.esperado) + '</b> en efectivo.</span></div>' +
+      campo('Efectivo contado (S/)', entrada('contado', '', 'type="number" step="0.1" min="0" inputmode="decimal" autofocus')) + campo('Nota (opcional)', entrada('nota', '')) +
+      '<div class="modal-pie"><button type="button" class="btn" data-a="cerrarModal">Cancelar</button><button type="submit" class="btn btn-primario">' + ic('check') + 'Cerrar caja</button></div></form>');
+  };
+  FORM.cierre = function (f, d, btn) {
+    ocupado(btn, true);
+    llamar('cerrarCaja', d).then(function (r) {
+      cerrarModal();
+      avisar(Math.abs(r.diferencia) < 0.5 ? 'Caja cerrada. Cuadra perfecto.' : 'Caja cerrada con diferencia de ' + soles(r.diferencia) + '.', Math.abs(r.diferencia) < 0.5 ? 'ok' : 'alerta');
+      pintarVista();
+    }).catch(function (e) { ocupado(btn, false); fallo(e); });
+  };
+
+  // ================= PERSONAL =================
+  VISTAS.personal = function (c, n) {
+    var tab = E.params.tab || 'hoy';
+    return llamar('personalResumen').then(function (d) {
+      if (!vigente(n)) return;
+      E.datos.personal = d;
+      var admin = E.perfil.rol === 'admin';
+      var html = cabecera('Personal', plural(d.presentes, 'persona trabajando ahora', 'personas trabajando ahora') + (d.noMarcaron ? ' · ' + d.noMarcaron + ' no marcaron' : ''),
+        admin ? '<button class="btn btn-primario" data-a="nuevoTrabajador">' + ic('nuevoSocio') + 'Nuevo trabajador</button>' : '') +
+        pestanas([['hoy', 'Asistencia de hoy'], ['equipo', 'Equipo y semana']], tab, 'tabPersonal');
+      if (tab === 'hoy') {
+        html += '<section class="tarjeta" style="padding:12px 20px"><div class="lista">' + d.deHoy.map(filaAsistencia).join('') + '</div></section>' +
+          '<div class="nota mt">' + ic('info') + '<span>El personal marca su entrada y salida con su PIN en la pantalla de Portería.</span></div>';
+      } else {
+        html += '<section class="tarjeta" style="padding:12px 20px"><div class="lista">' + d.trabajadores.map(function (p) {
+          return '<div class="fila' + (admin ? ' boton' : '') + '"' + (admin ? ' data-a="editarTrabajador" data-id="' + p.id + '"' : '') + '><span class="avatar">' + esc(iniciales(p.nombre)) + '</span>' +
+            '<div class="principal"><div class="nombre">' + esc(p.nombre) + (p.activo ? '' : ' (inactivo)') + '</div><div class="meta">' + esc(p.cargo) + ' · ' + esc(p.area) + ' · ' + esc(p.hora_entrada) + ' a ' + esc(p.hora_salida) + '</div></div>' +
+            '<div class="lado"><div class="nombre">' + plural(p.dias, 'día', 'días') + '</div><div class="meta">' + (p.tardanzas ? plural(p.tardanzas, 'tardanza', 'tardanzas') : 'Sin tardanzas') + '</div></div>' + (admin ? ic('derecha') : '') + '</div>';
+        }).join('') + '</div></section><p class="sub centro mt">Días trabajados y tardanzas de los últimos 7 días.</p>';
+      }
+      c.innerHTML = html;
+    });
+  };
+  ACC.tabPersonal = function (el) { ir('personal', { tab: el.dataset.v }); };
+  function formTrabajador(p) {
+    p = p || {};
+    var areas = ['administración', 'barra', 'portería', 'mantenimiento', 'limpieza', 'piscina', 'seguridad', 'jardinería'];
+    return '<form class="formulario" data-f="trabajador">' + (p.id ? '<input type="hidden" name="id" value="' + p.id + '">' : '') +
+      '<div class="dos">' + campo('Nombres', entrada('nombres', p.nombres, 'autofocus')) + campo('Apellidos', entrada('apellidos', p.apellidos)) + '</div>' +
+      '<div class="dos">' + campo('DNI', entrada('dni', p.dni, 'inputmode="numeric" maxlength="8"')) + campo('Cargo', entrada('cargo', p.cargo, 'placeholder="Por ejemplo: Portero"')) + '</div>' +
+      '<label class="campo"><span>Área</span><select class="entrada" name="area">' + areas.map(function (a) { return '<option' + (a === p.area ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></label>' +
+      '<div class="dos">' + campo('Hora de entrada', entrada('hora_entrada', p.hora_entrada || '08:00', 'type="time"')) + campo('Hora de salida', entrada('hora_salida', p.hora_salida || '16:00', 'type="time"')) + '</div>' +
+      campo(p.id ? 'Nuevo PIN (opcional)' : 'PIN para marcar asistencia', entrada('pin', '', 'inputmode="numeric" maxlength="4" placeholder="4 números"'), p.id ? 'Déjalo vacío para mantener el PIN actual.' : 'Con este PIN marca su entrada y salida en portería.') +
+      '<div class="modal-pie"><button type="button" class="btn" data-a="cerrarModal">Cancelar</button><button type="submit" class="btn btn-primario">' + ic('check') + 'Guardar</button></div></form>';
+  }
+  ACC.nuevoTrabajador = function () { abrirModal(modalCab('Nuevo trabajador') + formTrabajador()); };
+  ACC.editarTrabajador = function (el) {
+    var p = E.datos.personal.trabajadores.find(function (x) { return x.id === el.dataset.id; });
+    abrirModal(modalCab('Editar trabajador', p.nombre) + formTrabajador(p));
+  };
+  FORM.trabajador = function (f, d, btn) {
+    ocupado(btn, true);
+    llamar('guardarTrabajador', d).then(function () { cerrarModal(); avisar('Trabajador guardado.'); pintarVista(); }).catch(function (e) { ocupado(btn, false); fallo(e); });
+  };
+
+  // ================= RESERVAS DE TENIS =================
+  VISTAS.reservas = function (c, n) {
+    return llamar('reservasDia', { fecha: E.params.fecha }).then(function (d) {
+      if (!vigente(n)) return;
+      E.datos.reservas = d;
+      var esSocio = E.perfil.rol === 'socio', puede = E.perfil.rol !== 'directiva';
+      var dias = '<div class="chips desliza mb" style="justify-content:safe center">' + d.dias.map(function (f) {
+        return '<button class="chip ' + (f === d.fecha ? 'activo' : '') + '" data-a="diaTenis" data-v="' + f + '">' + esc(diaRelativo(f, d.hoy)) + '</button>';
+      }).join('') + '</div>';
+      var grilla = '<div class="grilla-tenis"><span></span>' + d.canchas.map(function (k) { return '<div class="cab">' + esc(k) + '</div>'; }).join('');
+      var horas = d.fecha === d.hoy ? d.horas.filter(function (h) { return h > d.ahora; }) : d.horas;
+      if (!horas.length) grilla += '<div style="grid-column:1/-1">' + vacio('reservas', 'Por hoy ya no quedan horarios. Elige otro día.') + '</div>';
+      horas.forEach(function (h) {
+        grilla += '<div class="h">' + h + '</div>';
+        d.canchas.forEach(function (k) {
+          var r = d.reservas.find(function (x) { return x.hora === h && x.cancha === k; });
+          var pasado = d.fecha === d.hoy && h <= d.ahora;
+          if (r) {
+            var mia = r.mia || !esSocio;
+            grilla += '<button class="turno ' + (r.mia ? 'mio' : 'ocupado') + (pasado ? ' pasado' : '') + '"' + (mia && puede ? ' data-a="verReserva" data-id="' + r.id + '"' : ' disabled') + '>' + esc(r.socio) + '</button>';
+          } else {
+            grilla += '<button class="turno' + (pasado ? ' pasado' : '') + '"' + (puede && !pasado ? ' data-a="nuevaReserva" data-h="' + h + '" data-k="' + esc(k) + '"' : ' disabled') + '>' + (pasado ? '—' : 'Libre') + '</button>';
+          }
+        });
+      });
+      grilla += '</div>';
+      c.innerHTML = cabecera('Reservas de tenis', esSocio ? 'Elige un horario libre para jugar' : 'Toca un horario libre para reservar a nombre de un socio') + dias +
+        '<section class="tarjeta">' + grilla + '</section>' +
+        '<p class="sub centro mt">Cada turno dura una hora. ' + (esSocio ? 'Puedes reservar una vez por día, hasta con una semana de anticipación.' : 'Un socio puede reservar una vez por día.') + '</p>';
+    });
+  };
+  ACC.diaTenis = function (el) { ir('reservas', { fecha: el.dataset.v }); };
+  ACC.nuevaReserva = function (el) {
+    var d = E.datos.reservas, h = el.dataset.h, k = el.dataset.k;
+    var titulo = k + ' · ' + diaRelativo(d.fecha, d.hoy) + ' a las ' + h;
+    if (E.perfil.rol === 'socio') {
+      confirmar('Reservar ' + k, diaRelativo(d.fecha, d.hoy) + ' (' + fechaLarga(d.fecha) + ') de ' + h + ' a ' + (Number(h.slice(0, 2)) + 1) + ':00.', 'Reservar').then(function () {
+        llamar('reservar', { fecha: d.fecha, hora: h, cancha: k }).then(function () { avisar('Listo, tu cancha está reservada.'); pintarVista(); }).catch(fallo);
+      });
+      return;
+    }
+    abrirModal(modalCab('Reservar', titulo) + '<div class="buscador">' + ic('buscar') + '<input class="entrada" id="buscarReserva" type="search" placeholder="Busca al socio por DNI o nombre" data-in="buscarReserva" autofocus></div><div id="resReserva" class="lista mt"></div>',
+      function (m) { m.dataset.h = h; m.dataset.k = k; });
+  };
+  var reservaTiempo;
+  ENTRADA.buscarReserva = function (el) {
+    clearTimeout(reservaTiempo);
+    var q = el.value.trim(), r = $('#resReserva');
+    if (q.length < 2) { r.innerHTML = ''; return; }
+    reservaTiempo = setTimeout(function () {
+      llamar('buscarSocios', { q: q }).then(function (lista) {
+        r.innerHTML = lista.length ? lista.map(function (s) {
+          return '<div class="fila boton" data-a="confirmarReserva" data-id="' + s.id + '"><span class="avatar">' + esc(iniciales(s.nombres + ' ' + s.apellidos)) + '</span><div class="principal"><div class="nombre">' + esc(s.nombre) + '</div><div class="meta">' + esc(s.codigo) + ' · DNI ' + esc(s.dni) + '</div></div>' + estadoSocio(s) + '</div>';
+        }).join('') : vacio('buscar', 'No encontramos a ese socio.');
+      }).catch(fallo);
+    }, 280);
+  };
+  ACC.confirmarReserva = function (el) {
+    var m = capa.firstElementChild, d = E.datos.reservas;
+    llamar('reservar', { fecha: d.fecha, hora: m.dataset.h, cancha: m.dataset.k, socio_id: el.dataset.id }).then(function (r) {
+      cerrarModal(); avisar('Reservado para ' + r.socio + '.'); pintarVista();
+    }).catch(fallo);
+  };
+  ACC.verReserva = function (el) {
+    var d = E.datos.reservas, r = d.reservas.find(function (x) { return x.id === el.dataset.id; });
+    abrirModal(modalCab(r.cancha + ' · ' + r.hora, diaRelativo(d.fecha, d.hoy) + ', ' + fechaLarga(d.fecha)) +
+      '<p>' + esc(E.perfil.rol === 'socio' ? 'Esta es tu reserva.' : 'Reservado por ' + r.socio + '.') + '</p>' +
+      '<div class="modal-pie mt-l"><button class="btn" data-a="cerrarModal">Volver</button><button class="btn btn-peligro" data-a="cancelarReserva" data-id="' + r.id + '">Cancelar reserva</button></div>');
+  };
+  ACC.cancelarReserva = function (el) {
+    llamar('cancelarReserva', { id: el.dataset.id }).then(function () { cerrarModal(); avisar('Reserva cancelada.'); pintarVista(); }).catch(fallo);
+  };
+
+  // ================= ALQUILERES =================
+  var ESTADO_ALQ = { reservado: ['Sin adelanto', 'alerta'], confirmado: ['Confirmado', 'azul'], realizado: ['Realizado', 'ok'], cancelado: ['Cancelado', 'peligro'] };
+  var TIPO_CLI = { socio: 'Socio', no_socio: 'No socio', institucion: 'Institución' };
+  VISTAS.alquileres = function (c, n) {
+    return llamar('listarAlquileres').then(function (d) {
+      if (!vigente(n)) return;
+      E.datos.alquileres = d;
+      var admin = E.perfil.rol === 'admin';
+      var prox = d.alquileres.filter(function (a) { return !a.pasado; }), pas = d.alquileres.filter(function (a) { return a.pasado; }).reverse();
+      var fila = function (a) {
+        var p = partes(a.fecha), e = ESTADO_ALQ[a.estado];
+        return '<div class="fila boton" data-a="verAlquiler" data-id="' + a.id + '"><div class="fecha-bloque' + (a.pasado ? ' pasado' : '') + '"><b>' + p.d + '</b><span>' + MESES[p.m - 1].slice(0, 3) + '</span></div>' +
+          '<div class="principal"><div class="nombre">' + esc(a.ambiente) + '</div><div class="meta">' + esc(a.cliente) + ' · ' + TIPO_CLI[a.tipo] + '</div></div>' +
+          '<div class="lado ocultar-movil"><div class="monto">' + soles(a.monto) + '</div><div class="meta">' + (a.saldo > 0 ? 'Saldo ' + soles(a.saldo) : 'Pagado') + '</div></div>' +
+          '<span class="etiqueta ' + e[1] + '">' + e[0] + '</span></div>';
+      };
+      var tarifas = d.ambientes.map(function (a) {
+        var t = a.tarifas, txt = [t.socio ? 'Socio ' + solesCorto(t.socio) : '', t.no_socio ? 'No socio ' + solesCorto(t.no_socio) : '', t.institucion ? 'Institución ' + solesCorto(t.institucion) : ''].filter(Boolean).join(' · ');
+        return '<div class="fila"><div class="principal"><div class="nombre">' + esc(a.nombre) + '</div><div class="meta">' + esc(txt || a.nota || 'Por confirmar') + (a.garantia ? ' · garantía ' + solesCorto(a.garantia) : '') + '</div></div></div>';
+      }).join('');
+      c.innerHTML = cabecera('Alquileres', 'Salón, rincón parrillero, piscina y deck', admin ? '<button class="btn btn-primario" data-a="nuevoAlquiler">' + ic('mas') + 'Nuevo alquiler</button>' : '') +
+        '<div class="rejilla-2 ancha" style="margin-top:0"><section class="tarjeta"><div class="tarjeta-cab"><h2>Próximos</h2><p>' + plural(prox.length, 'evento', 'eventos') + '</p></div><div class="lista">' + (prox.map(fila).join('') || vacio('alquileres', 'No hay alquileres próximos.')) + '</div>' +
+        (pas.length ? '<h2 class="mt-l">Pasados</h2><div class="lista mt">' + pas.slice(0, 10).map(fila).join('') + '</div>' : '') + '</section>' +
+        '<section class="tarjeta"><h2>Tarifas</h2><p class="sub">Precios sin IGV</p><div class="lista mt">' + tarifas + '</div></section></div>';
+    });
+  };
+  ACC.nuevoAlquiler = function () {
+    var d = E.datos.alquileres;
+    abrirModal(modalCab('Nuevo alquiler') + '<form class="formulario" data-f="alquiler">' +
+      '<label class="campo"><span>Ambiente</span><select class="entrada" name="ambiente" id="ambAlq">' + d.ambientes.map(function (a) { return '<option>' + esc(a.nombre) + '</option>'; }).join('') + '</select></label>' +
+      '<div class="campo"><span>Cliente</span>' + opciones('tipo', [['socio', 'Socio'], ['no_socio', 'No socio'], ['institucion', 'Institución']], 'socio') + '</div>' +
+      '<div class="dos">' + campo('Fecha del evento', entrada('fecha', sumarDias(d.hoy, 7), 'type="date" min="' + d.hoy + '"')) + campo('Nombre del cliente', entrada('cliente', '', 'autocomplete="off"')) + '</div>' +
+      '<div class="dos">' + campo('Celular', entrada('celular', '', 'inputmode="tel" maxlength="9"')) + campo('Precio (S/)', entrada('monto', '', 'type="number" min="0" step="10" inputmode="decimal" id="montoAlq"')) + '</div>' +
+      '<div class="dos">' + campo('Adelanto (S/)', entrada('adelanto', '0', 'type="number" min="0" step="10" inputmode="decimal"')) + '<div class="campo"><span>Medio del adelanto</span>' + opciones('medio', MEDIOS.filter(function (m) { return m[0] !== 'plin' && m[0] !== 'tarjeta'; }), 'transferencia') + '</div></div>' +
+      campo('Nota (opcional)', entrada('nota', '', 'placeholder="Por ejemplo: decoración el día anterior"')) +
+      '<div class="modal-pie"><button type="button" class="btn" data-a="cerrarModal">Cancelar</button><button type="submit" class="btn btn-primario">' + ic('check') + 'Guardar alquiler</button></div></form>',
+      function (m) {
+        var pon = function () {
+          var a = d.ambientes.find(function (x) { return x.nombre === $('#ambAlq', m).value; });
+          var tipo = (m.querySelector('input[name=tipo]:checked') || {}).value;
+          var precio = a && a.tarifas[tipo];
+          $('#montoAlq', m).value = precio || '';
+          $('#montoAlq', m).placeholder = precio ? '' : 'Tarifa por confirmar';
+        };
+        m.addEventListener('change', function (e) { if (e.target.name === 'ambiente' || e.target.name === 'tipo') pon(); });
+        pon();
+      });
+  };
+  FORM.alquiler = function (f, d, btn) {
+    ocupado(btn, true);
+    llamar('guardarAlquiler', d).then(function () { cerrarModal(); avisar('Alquiler guardado.'); pintarVista(); }).catch(function (e) { ocupado(btn, false); fallo(e); });
+  };
+  ACC.verAlquiler = function (el) {
+    var a = E.datos.alquileres.alquileres.find(function (x) { return x.id === el.dataset.id; });
+    var admin = E.perfil.rol === 'admin', e = ESTADO_ALQ[a.estado];
+    var acciones = '';
+    if (admin && a.estado !== 'cancelado' && a.estado !== 'realizado') {
+      if (a.saldo > 0) acciones += '<button class="btn btn-primario" data-a="cobrarAlquiler" data-id="' + a.id + '">' + ic('dinero') + 'Cobrar saldo ' + soles(a.saldo) + '</button>';
+      acciones += '<button class="btn" data-a="estadoAlquiler" data-id="' + a.id + '" data-v="realizado">Marcar realizado</button>';
+      acciones += '<button class="btn btn-peligro" data-a="estadoAlquiler" data-id="' + a.id + '" data-v="cancelado">Cancelar</button>';
+    }
+    abrirModal(modalCab(a.ambiente, fechaLarga(a.fecha)) + '<div class="etiquetas" style="justify-content:flex-start"><span class="etiqueta ' + e[1] + '">' + e[0] + '</span><span class="etiqueta">' + TIPO_CLI[a.tipo] + '</span></div>' +
+      '<dl class="datos"><dt>Cliente</dt><dd>' + esc(a.cliente) + '</dd><dt>Celular</dt><dd class="num">' + esc(a.celular || '—') + '</dd><dt>Precio</dt><dd class="num">' + soles(a.monto) + '</dd><dt>Adelanto</dt><dd class="num">' + soles(a.adelanto) + '</dd><dt>Saldo</dt><dd class="num">' + soles(a.saldo) + '</dd>' + (a.nota ? '<dt>Nota</dt><dd>' + esc(a.nota) + '</dd>' : '') + '</dl>' +
+      (acciones ? '<div class="modal-pie mt-l" style="justify-content:flex-start">' + acciones + '</div>' : ''));
+  };
+  ACC.cobrarAlquiler = function (el) {
+    var a = E.datos.alquileres.alquileres.find(function (x) { return x.id === el.dataset.id; });
+    abrirModal(modalCab('Cobrar saldo', a.ambiente + ' · ' + a.cliente) + '<form class="formulario" data-f="cobroAlquiler"><input type="hidden" name="id" value="' + a.id + '"><input type="hidden" name="estado" value="' + a.estado + '">' +
+      '<div class="total"><span>Saldo</span><b>' + soles(a.saldo) + '</b></div><div class="campo"><span>Cómo pagó</span>' + opciones('medio', MEDIOS, 'transferencia') + '</div>' +
+      '<div class="modal-pie"><button type="button" class="btn" data-a="cerrarModal">Cancelar</button><button type="submit" class="btn btn-primario">' + ic('check') + 'Registrar cobro</button></div></form>');
+  };
+  FORM.cobroAlquiler = function (f, d, btn) {
+    ocupado(btn, true);
+    llamar('cambiarEstadoAlquiler', { id: d.id, estado: d.estado, cobrar: true, medio: d.medio }).then(function () { cerrarModal(); avisar('Saldo cobrado.'); pintarVista(); }).catch(function (e) { ocupado(btn, false); fallo(e); });
+  };
+  ACC.estadoAlquiler = function (el) {
+    var v = el.dataset.v;
+    confirmar(v === 'cancelado' ? 'Cancelar alquiler' : 'Marcar como realizado', v === 'cancelado' ? 'El ambiente quedará libre ese día.' : 'El evento ya se hizo.', v === 'cancelado' ? 'Cancelar alquiler' : 'Marcar realizado', v === 'cancelado').then(function () {
+      llamar('cambiarEstadoAlquiler', { id: el.dataset.id, estado: v }).then(function () { avisar('Alquiler actualizado.'); pintarVista(); }).catch(fallo);
+    });
+  };
+
+  // ================= AVISOS =================
+  VISTAS.avisos = function (c, n) {
+    return llamar('listarAvisos').then(function (lista) {
+      if (!vigente(n)) return;
+      E.datos.avisos = lista;
+      var admin = E.perfil.rol === 'admin';
+      c.innerHTML = cabecera('Avisos para socios', 'Lo que publiques aquí lo ven los socios en su cuenta') +
+        '<div class="rejilla-2" style="margin-top:0">' +
+        (admin ? '<section class="tarjeta"><h2>Nuevo aviso</h2><form class="formulario mt" data-f="aviso">' + campo('Título', entrada('titulo', '', 'maxlength="100" placeholder="Por ejemplo: Cierre de piscina"')) +
+          campo('Texto', '<textarea class="entrada" name="texto" maxlength="600" placeholder="Escribe el aviso como se lo dirías a un socio"></textarea>') +
+          '<button type="submit" class="btn btn-primario">' + ic('avisos') + 'Publicar aviso</button></form></section>' : '') +
+        '<section class="tarjeta"><h2>Publicados</h2><div class="lista mt">' + (lista.length ? lista.map(function (a) {
+          return '<div class="fila"><span class="icono-circulo ' + (a.activo ? 'azul' : '') + '">' + ic('avisos') + '</span><div class="principal"><div class="nombre">' + esc(a.titulo) + '</div><div class="meta">' + fechaMedia(a.fecha) + ' · ' + esc(a.texto) + '</div></div>' +
+            (admin ? '<button class="btn btn-sm" data-a="toggleAviso" data-id="' + a.id + '">' + (a.activo ? 'Ocultar' : 'Mostrar') + '</button>' : (a.activo ? '<span class="etiqueta azul">Visible</span>' : '<span class="etiqueta">Oculto</span>')) + '</div>';
+        }).join('') : vacio('avisos', 'Todavía no hay avisos.')) + '</div></section></div>';
+    });
+  };
+  FORM.aviso = function (f, d, btn) {
+    ocupado(btn, true);
+    llamar('guardarAviso', d).then(function () { avisar('Aviso publicado.'); pintarVista(); }).catch(function (e) { ocupado(btn, false); fallo(e); });
+  };
+  ACC.toggleAviso = function (el) {
+    var a = E.datos.avisos.find(function (x) { return x.id === el.dataset.id; });
+    el.disabled = true;
+    llamar('guardarAviso', { id: a.id, titulo: a.titulo, texto: a.texto, activo: !a.activo }).then(function () { avisar(a.activo ? 'Aviso oculto.' : 'Aviso visible.'); pintarVista(); }).catch(function (e) { el.disabled = false; fallo(e); });
+  };
+
+  // ================= AJUSTES =================
+  VISTAS.ajustes = function (c, n) {
+    return llamar('ajustes').then(function (d) {
+      if (!vigente(n)) return;
+      E.datos.ajustes = d;
+      var campos = d.config.filter(function (x) { return x.clave !== 'club_nombre' && x.clave !== 'datos_de_ejemplo'; }).map(function (x) {
+        var html = x.clave === 'bloquear_morosos'
+          ? '<select class="entrada" name="' + x.clave + '"><option value="NO"' + (x.valor !== 'SI' ? ' selected' : '') + '>No: puede entrar y se le avisa</option><option value="SI"' + (x.valor === 'SI' ? ' selected' : '') + '>Sí: no puede entrar</option></select>'
+          : entrada(x.clave, x.valor, 'type="number" min="0" inputmode="decimal"');
+        return campo(x.descripcion, html);
+      }).join('');
+      var ejemplo = d.config.find(function (x) { return x.clave === 'datos_de_ejemplo'; });
+      c.innerHTML = cabecera('Ajustes', 'Reglas del club, accesos y base de datos') +
+        '<div class="rejilla-2" style="margin-top:0"><section class="tarjeta"><h2>Reglas del club</h2><form class="formulario mt" data-f="ajustes">' + campos +
+        '<button type="submit" class="btn btn-primario">' + ic('check') + 'Guardar reglas</button></form></section>' +
+        '<div class="pila"><section class="tarjeta"><h2>Usuarios del personal</h2><div class="lista mt">' + d.usuarios.map(function (u) {
+          return '<div class="fila"><span class="icono-circulo azul">' + ic('usuario') + '</span><div class="principal"><div class="nombre">' + esc(u.usuario) + '</div><div class="meta">' + esc(u.rol) + '</div></div><button class="btn btn-sm" data-a="claveUsuario" data-id="' + u.id + '" data-u="' + esc(u.usuario) + '">' + ic('llave') + 'Cambiar clave</button></div>';
+        }).join('') + '</div></section>' +
+        '<section class="tarjeta"><h2>Base de datos</h2><p class="sub mt">Todo se guarda en una hoja de Google Sheets que puedes abrir, filtrar o descargar.</p>' +
+        '<div class="acciones"><a class="btn" href="' + esc(d.hojaUrl) + '" target="_blank" rel="noopener">' + ic('hoja') + 'Abrir en Google Sheets</a></div>' +
+        (ejemplo && ejemplo.valor === 'SI' ? '<div class="nota alerta mt">' + ic('alerta') + '<span>El sistema tiene datos de ejemplo. Antes de la presentación puedes dejarlos como al inicio.</span></div><div class="acciones"><button class="btn btn-peligro" data-a="reiniciarEjemplo">' + ic('recargar') + 'Reiniciar datos de ejemplo</button></div>' : '') +
+        '</section></div></div>';
+    });
+  };
+  FORM.ajustes = function (f, d, btn) {
+    ocupado(btn, true);
+    llamar('guardarAjustes', { valores: d }).then(function () { ocupado(btn, false); avisar('Reglas guardadas.'); }).catch(function (e) { ocupado(btn, false); fallo(e); });
+  };
+  ACC.claveUsuario = function (el) {
+    abrirModal(modalCab('Cambiar clave', 'Usuario ' + el.dataset.u) + '<form class="formulario" data-f="claveUsuario"><input type="hidden" name="id" value="' + el.dataset.id + '">' +
+      campo('Clave nueva', entrada('clave', '', 'type="text" autocomplete="off" minlength="8" autofocus'), 'Al menos 8 caracteres. Anótala y entrégala a la persona.') +
+      '<div class="modal-pie"><button type="button" class="btn" data-a="cerrarModal">Cancelar</button><button type="submit" class="btn btn-primario">' + ic('check') + 'Guardar clave</button></div></form>');
+  };
+  FORM.claveUsuario = function (f, d, btn) {
+    ocupado(btn, true);
+    llamar('cambiarClaveUsuario', d).then(function () { cerrarModal(); avisar('Clave cambiada.'); }).catch(function (e) { ocupado(btn, false); fallo(e); });
+  };
+  ACC.reiniciarEjemplo = function () {
+    confirmar('Reiniciar datos de ejemplo', 'Se borran todos los movimientos de prueba y se vuelven a cargar los datos de ejemplo. Las claves del personal vuelven a ser las iniciales.', 'Reiniciar', true).then(function () {
+      avisar('Reiniciando… puede tardar unos segundos.', 'alerta');
+      llamar('reiniciarDatosEjemplo').then(function () { avisar('Datos de ejemplo listos.'); ir('inicio'); }).catch(fallo);
+    });
+  };
+
+  // ================= VISTA DEL SOCIO =================
+  VISTAS.micuenta = function (c, n) {
+    return llamar('miCuenta').then(function (s) {
+      if (!vigente(n)) return;
+      E.datos.mia = s;
+      var cu = s.cuenta;
+      var meses = s.cuotas.slice(0, 12).reverse().map(function (q) {
+        return '<div class="mes ' + q.estado + '"><b>' + esc(q.mes.split(' ')[0]) + '</b>' + (q.estado === 'pagada' ? 'Pagada' : q.estado === 'vencida' ? 'Vencida' : 'Por pagar') + '</div>';
+      }).join('');
+      var reservas = s.reservas.length ? s.reservas.map(function (r) {
+        return '<div class="fila"><span class="icono-circulo azul">' + ic('reservas') + '</span><div class="principal"><div class="nombre">' + esc(r.cancha) + ' · ' + esc(r.hora) + '</div><div class="meta">' + esc(diaRelativo(r.fecha, s.hoy)) + ', ' + fechaLarga(r.fecha) + '</div></div></div>';
+      }).join('') : '<p class="sub">No tienes reservas próximas.</p>';
+      var avisos = s.avisos.length ? s.avisos.map(function (a) {
+        return '<div class="fila" style="align-items:flex-start"><span class="icono-circulo azul">' + ic('avisos') + '</span><div class="principal"><div class="nombre" style="white-space:normal">' + esc(a.titulo) + '</div><div class="meta" style="white-space:normal">' + esc(a.texto) + '</div></div></div>';
+      }).join('') : '<p class="sub">No hay avisos nuevos.</p>';
+      var pagos = s.pagos.length ? s.pagos.slice(0, 5).map(function (p) {
+        return '<div class="fila"><div class="principal"><div class="nombre">' + esc(p.periodos.join(', ')) + '</div><div class="meta">' + fechaMedia(p.fecha) + ' · ' + esc(p.medio) + '</div></div><span class="monto">' + soles(p.monto) + '</span></div>';
+      }).join('') : '<p class="sub">Todavía no hay pagos.</p>';
+      c.innerHTML = cabecera('Hola, ' + s.nombres.split(' ')[0], cu.alDia ? 'Estás al día con el club' : 'Tienes ' + plural(cu.vencidas, 'cuota vencida', 'cuotas vencidas'),
+        '<button class="btn btn-primario" data-a="ir" data-v="carnet">' + ic('qr') + 'Ver mi carnet</button><button class="btn" data-a="ir" data-v="reservas">' + ic('reservas') + 'Reservar tenis</button>') +
+        '<div class="rejilla-2" style="margin-top:0"><section class="tarjeta"><h2>Mis cuotas</h2>' +
+        (cu.alDia ? '<div class="grande-num" style="color:var(--ok)">Al día</div><p class="sub">' + (cu.porPagar ? 'Próxima cuota ' + soles(cu.porPagar) + (cu.proximaVence ? ', vence el ' + fechaLarga(cu.proximaVence) : '') : 'No tienes cuotas pendientes') + '</p>'
+          : '<div class="grande-num" style="color:var(--peligro)">' + soles(cu.deudaVencida) + '</div><p class="sub">Acércate a administración para ponerte al día.</p>') +
+        '<div class="meses">' + meses + '</div></section>' +
+        '<section class="tarjeta"><h2>Avisos del club</h2><div class="lista mt">' + avisos + '</div></section></div>' +
+        '<div class="rejilla-2"><section class="tarjeta"><h2>Mis reservas</h2><div class="lista mt">' + reservas + '</div></section>' +
+        '<section class="tarjeta"><h2>Mis pagos</h2><div class="lista mt">' + pagos + '</div></section></div>';
+    });
+  };
+  VISTAS.carnet = function (c, n) {
+    return llamar('miCuenta').then(function (s) {
+      if (!vigente(n)) return;
+      var qr = '';
+      try { var q = window.qrcode(0, 'M'); q.addData(s.carnet); q.make(); qr = q.createSvgTag({ cellSize: 6, margin: 0, scalable: true }); }
+      catch (e) { qr = '<div class="vacio">' + ic('qr') + '<p>' + esc(s.carnet) + '</p></div>'; }
+      c.innerHTML = cabecera('Mi carnet', 'Muéstralo en portería al entrar') +
+        '<div class="carnet"><div class="carnet-cab"><img src="' + window.SOL_CLUB + '" alt=""><div><b>Casino de Pimentel</b><span>Carnet de socio</span></div></div>' +
+        '<div class="carnet-cuerpo"><div class="carnet-qr">' + qr + '</div><div class="carnet-nombre">' + esc(s.nombre) + '</div>' +
+        '<p class="sub">Socio ' + esc(s.codigo) + ' · DNI ' + esc(s.dni) + '</p><div class="etiquetas mt">' + estadoSocio(s) + '</div></div></div>' +
+        (s.familiares.length ? '<section class="tarjeta mt-l" style="max-width:390px;margin-left:auto;margin-right:auto"><h2>Pueden entrar contigo</h2><div class="lista mt">' + s.familiares.map(function (f) {
+          return '<div class="fila"><span class="avatar">' + esc(iniciales(f.nombre)) + '</span><div class="principal"><div class="nombre">' + esc(f.nombre) + '</div><div class="meta">' + esc(f.parentesco) + '</div></div></div>';
+        }).join('') + '</div></section>' : '');
+    });
+  };
+
+  // ================= Arranque =================
+  E.token = almacen.get('cp_token');
+  if (E.token) {
+    app.innerHTML = cargando();
+    llamar('miPerfil').then(function (p) { E.perfil = p; E.ejemplo = p.ejemplo; render(); }).catch(function () { cerrarSesionLocal(); render(); });
+  } else {
+    llamar('estadoPublico').then(function (d) { E.ejemplo = d.ejemplo; if (!E.token) render(); }).catch(function () { render(); });
+    render();
+  }
+})();
+</script>

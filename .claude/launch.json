@@ -1,6 +1,7 @@
 {
   "version": "0.0.1",
   "configurations": [
+    { "name": "sistema", "runtimeExecutable": "node", "runtimeArgs": ["appscript/dev/servidor.mjs"], "port": 3000, "url": "http://localhost:3000" },
     { "name": "app", "runtimeExecutable": "npm", "runtimeArgs": ["--prefix", "app", "run", "dev", "--", "--port", "5173", "--strictPort"], "port": 5173, "url": "http://localhost:5173" },
     { "name": "web", "runtimeExecutable": "npm", "runtimeArgs": ["--prefix", "web", "run", "dev", "--", "--port", "4321"], "port": 4321, "url": "http://localhost:4321" },
     { "name": "todo", "runtimeExecutable": "npx", "runtimeArgs": ["serve", "dist", "-l", "8888", "-c", "../serve.json"], "port": 8888, "url": "http://localhost:8888" }

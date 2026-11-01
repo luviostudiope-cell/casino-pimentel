@@ -16,3 +16,8 @@ assets-cliente/
 test-results/
 playwright-report/
 .claude/settings.local.json
+
+# Sistema en Apps Script: datos y capturas locales
+appscript/dev/datos-locales.json
+appscript/capturas/
+.clasprc.json
