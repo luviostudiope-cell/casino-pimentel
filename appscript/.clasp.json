@@ -1,0 +1,22 @@
+{
+  "scriptId": "1JHnG1GtkJ6jClpuGBqbKa9KXepw6-U7B3mZeDuViUbo5doUTmZ4_lcKa",
+  "rootDir": "src",
+  "scriptExtensions": [
+    ".js",
+    ".gs"
+  ],
+  "htmlExtensions": [
+    ".html"
+  ],
+  "jsonExtensions": [
+    ".json"
+  ],
+  "filePushOrder": [
+    "src/Datos.js",
+    "src/Sesion.js",
+    "src/Api.js",
+    "src/Instalar.js",
+    "src/Codigo.js"
+  ],
+  "skipSubdirectories": false
+}
