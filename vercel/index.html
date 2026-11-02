@@ -40,7 +40,8 @@
     <p style="margin:0">Abriendo el sistema del club…</p>
     <p id="ayuda">Está tardando más de lo normal. <a id="directo" target="_top">Abrir el sistema directamente</a></p>
   </div>
-  <iframe id="sistema" title="Sistema del Casino de Pimentel" allow="clipboard-write"></iframe>
+  <!-- credentialless: el sistema abre como visitante, sin mezclar las cuentas de Google abiertas en el navegador -->
+  <iframe id="sistema" title="Sistema del Casino de Pimentel" allow="clipboard-write" credentialless></iframe>
   <script>
     // El sistema vive en Google Apps Script; esta página solo le da una dirección corta.
     var SISTEMA = 'https://script.google.com/macros/s/AKfycbyIuh872nN7qy3mP9R3z6mOwbKDSsZkpSzU7OVp17ypTo8J34uEkT1TSh-MBw_ixb9L/exec';
