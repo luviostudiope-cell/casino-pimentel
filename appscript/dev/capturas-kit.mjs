@@ -1,0 +1,238 @@
+// Toma las capturas del sistema para el kit de presentación (computadora, tablet y celular).
+// Uso: node appscript/dev/capturas-kit.mjs <carpeta-salida>   (con el servidor local encendido)
+import { createRequire } from 'node:module'
+import { mkdirSync } from 'node:fs'
+const require = createRequire(import.meta.url)
+const { chromium } = require('../../node_modules/@playwright/test')
+
+const URL = process.env.URL || 'http://localhost:3000'
+const salida = process.argv[2] || 'capturas-kit'
+for (const c of ['computadora', 'tablet', 'celular']) mkdirSync(`${salida}/${c}`, { recursive: true })
+const navegador = await chromium.launch({ channel: 'chrome' })
+const hechas = []
+
+async function abrir(ancho, alto, escala) {
+  const ctx = await navegador.newContext({ viewport: { width: ancho, height: alto }, deviceScaleFactor: escala })
+  if (process.env.AHORA) await ctx.clock.setFixedTime(new Date(process.env.AHORA))
+  const p = await ctx.newPage()
+  p.on('pageerror', (e) => console.error('error en página:', e.message))
+  await p.goto(URL)
+  await p.waitForSelector('.acceso')
+  await p.waitForTimeout(600)
+  return p
+}
+async function quieto(p, ms = 1300) {
+  const v = p.viewportSize()
+  await p.mouse.move(v.width - 4, v.height - 4)
+  await p.waitForTimeout(ms)
+}
+async function foto(p, carpeta, nombre, completa = false) {
+  await quieto(p)
+  const ruta = `${salida}/${carpeta}/${nombre}.png`
+  await p.screenshot({ path: ruta, fullPage: completa })
+  hechas.push(`${carpeta}/${nombre}.png`)
+}
+async function vista(p) {
+  await p.waitForSelector('#vista .hero', { timeout: 20000 })
+  await p.waitForFunction(() => !document.querySelector('#vista .cargando'))
+}
+async function entrar(p, usuario, clave) {
+  await p.getByRole('tab', { name: 'Personal del club' }).click()
+  await p.locator('[name=usuario]').fill(usuario)
+  await p.locator('[name=clave]').fill(clave)
+  await p.getByRole('button', { name: 'Ingresar' }).click()
+  await vista(p)
+}
+async function ir(p, destino, desdeMenu = '.riel') {
+  await p.locator(`${desdeMenu} [data-nav=${destino}]`).click()
+  await vista(p)
+}
+async function pestana(p, nombre) {
+  await p.getByRole('tab', { name: nombre }).click()
+  await p.waitForTimeout(300)
+  await vista(p)
+}
+async function cerrarModal(p) { await p.locator('.modal [data-a=cerrarModal]').first().click(); await p.waitForTimeout(250) }
+async function teclear(p, numeros) { for (const d of numeros) { await p.locator(`.teclado [data-d="${d}"]`).click(); await p.waitForTimeout(90) } }
+
+// ================= Computadora (administración) =================
+{
+  const p = await abrir(1440, 900, 2)
+  await foto(p, 'computadora', '01-ingreso-socio')
+  await p.getByRole('tab', { name: 'Personal del club' }).click()
+  await p.waitForTimeout(400)
+  await foto(p, 'computadora', '02-ingreso-personal')
+  await p.locator('[name=usuario]').fill('admin')
+  await p.locator('[name=clave]').fill('Admin2026')
+  await p.getByRole('button', { name: 'Ingresar' }).click()
+  await vista(p)
+  await foto(p, 'computadora', '03-inicio')
+  await foto(p, 'computadora', '04-inicio-completo', true)
+  await p.getByRole('button', { name: 'Cómo funciona' }).click()
+  await foto(p, 'computadora', '05-inicio-como-funciona')
+  await cerrarModal(p)
+
+  await ir(p, 'porteria')
+  await foto(p, 'computadora', '06-porteria')
+  await p.locator('#buscarSocio').fill('Peralta')
+  await p.waitForSelector('#resultados article')
+  await foto(p, 'computadora', '07-porteria-busqueda')
+  await p.locator('#resultados article').first().getByRole('button', { name: 'Invitado' }).click()
+  await p.locator('.modal [name=nombre]').fill('Carlos Mendoza Ríos')
+  await p.locator('.modal [name=dni]').fill('70451236')
+  await foto(p, 'computadora', '08-porteria-invitado')
+  await p.locator('.modal [type=submit]').click()
+  await p.waitForSelector('.modal .ticket-papel')
+  await foto(p, 'computadora', '09-porteria-ticket-invitado')
+  await cerrarModal(p)
+  await pestana(p, 'Asistencia del personal')
+  await p.waitForSelector('#listaAsis .fila')
+  await foto(p, 'computadora', '10-porteria-asistencia')
+
+  await ir(p, 'socios')
+  await foto(p, 'computadora', '11-socios')
+  await p.getByRole('button', { name: 'Con deuda' }).click()
+  await p.waitForTimeout(500)
+  await foto(p, 'computadora', '12-socios-con-deuda')
+  await p.locator('#filtroSocios').fill('Chirinos Vera')
+  await p.waitForTimeout(300)
+  await p.locator('#listaSocios .fila').first().click()
+  await vista(p)
+  await foto(p, 'computadora', '13-socio-ficha')
+  await p.getByRole('button', { name: 'Registrar pago' }).click()
+  await foto(p, 'computadora', '14-socio-registrar-pago')
+  await p.locator('.modal [type=submit]').click()
+  await p.waitForSelector('.modal .ticket-papel')
+  await foto(p, 'computadora', '15-socio-recibo')
+  await cerrarModal(p)
+  await p.locator('.volver').click()
+  await vista(p)
+  await p.getByRole('button', { name: 'Nuevo socio' }).click()
+  await p.locator('.modal [name=nombres]').fill('Lucía')
+  await p.locator('.modal [name=apellidos]').fill('Benites Saavedra')
+  await p.locator('.modal [name=dni]').fill('99880123')
+  await p.locator('.modal [data-a=abrirFecha]').click()
+  await p.locator('.modal [data-a=calAnio]').nth(6).click()
+  await p.locator('.modal [data-a=calMes]').nth(4).click()
+  await p.waitForTimeout(400)
+  await foto(p, 'computadora', '16-nuevo-socio-calendario')
+  await cerrarModal(p)
+
+  await ir(p, 'barra')
+  await foto(p, 'computadora', '17-barra')
+  const prod = p.locator('#productos .producto:not([disabled])')
+  await prod.nth(0).click(); await prod.nth(0).click(); await prod.nth(4).click(); await prod.nth(6).click()
+  await p.locator('#mesaBarra').fill('4')
+  await p.locator('.opcion:has(input[value=yape]) span').click()
+  await foto(p, 'computadora', '18-barra-pedido')
+  await p.locator('#ticket [data-a=cobrar]').click()
+  await p.waitForSelector('.modal .ticket-papel')
+  await foto(p, 'computadora', '19-barra-ticket')
+  await cerrarModal(p)
+  await pestana(p, 'Ventas de hoy')
+  await foto(p, 'computadora', '20-barra-ventas-de-hoy')
+  await pestana(p, 'Stock')
+  await foto(p, 'computadora', '21-barra-stock')
+
+  await ir(p, 'caja')
+  await foto(p, 'computadora', '22-caja')
+  await foto(p, 'computadora', '23-caja-completa', true)
+  await p.getByRole('button', { name: 'Cerrar caja' }).click()
+  await foto(p, 'computadora', '24-caja-cierre')
+  await cerrarModal(p)
+
+  await ir(p, 'personal')
+  await foto(p, 'computadora', '25-personal-hoy')
+  await pestana(p, 'Equipo y semana')
+  await foto(p, 'computadora', '26-personal-equipo')
+  await p.getByRole('button', { name: 'Nuevo trabajador' }).click()
+  await p.locator('.modal [data-a=abrirHora]').first().click()
+  await p.waitForTimeout(400)
+  await p.locator('.modal').evaluate((m) => { m.scrollTop = 250 })
+  await foto(p, 'computadora', '27-personal-horario')
+  await cerrarModal(p)
+
+  await ir(p, 'reservas')
+  await p.locator('.chip[data-a=diaTenis]').nth(1).click()
+  await vista(p)
+  await foto(p, 'computadora', '28-tenis')
+  await ir(p, 'alquileres')
+  await foto(p, 'computadora', '29-alquileres')
+  await p.getByRole('button', { name: 'Nuevo alquiler' }).click()
+  await p.locator('.modal [data-a=abrirFecha]').click()
+  await p.waitForTimeout(400)
+  await foto(p, 'computadora', '30-alquiler-nuevo')
+  await cerrarModal(p)
+  await ir(p, 'avisos')
+  await foto(p, 'computadora', '31-avisos')
+  await p.locator('.riel [data-nav=ajustes]').click()
+  await vista(p)
+  await foto(p, 'computadora', '32-ajustes')
+  await p.context().close()
+}
+
+// ================= Tablet (portería y barra) =================
+{
+  const p = await abrir(820, 1180, 2)
+  await entrar(p, 'porteria', 'Porteria2026')
+  await p.locator('#buscarSocio').fill('99107919')
+  await p.waitForSelector('#resultados article')
+  await foto(p, 'tablet', '01-porteria-busqueda')
+  await pestana(p, 'Asistencia del personal')
+  await p.waitForSelector('#listaAsis .fila')
+  await foto(p, 'tablet', '02-porteria-asistencia')
+  await p.context().close()
+  const b = await abrir(820, 1180, 2)
+  await entrar(b, 'barra', 'Barra2026')
+  const prod = b.locator('#productos .producto:not([disabled])')
+  await prod.nth(1).click(); await prod.nth(5).click(); await prod.nth(5).click()
+  await foto(b, 'tablet', '03-barra-vender')
+  await b.context().close()
+}
+
+// ================= Celular (socio, administración y portería) =================
+{
+  const p = await abrir(390, 844, 3)
+  await foto(p, 'celular', '01-ingreso')
+  await p.locator('[name=dni]').fill('99107919')
+  await p.getByRole('button', { name: 'Continuar' }).click()
+  await teclear(p, '246')
+  await foto(p, 'celular', '02-pin')
+  await teclear(p, '810')
+  await vista(p)
+  await foto(p, 'celular', '03-socio-mi-cuenta')
+  await p.evaluate(() => window.scrollTo(0, 620))
+  await foto(p, 'celular', '04-socio-mis-cuotas')
+  await p.evaluate(() => window.scrollTo(0, 0))
+  await ir(p, 'carnet', '.tabbar')
+  await p.evaluate(() => window.scrollTo(0, 300))
+  await foto(p, 'celular', '05-socio-carnet')
+  await p.evaluate(() => window.scrollTo(0, 0))
+  await ir(p, 'reservas', '.tabbar')
+  await foto(p, 'celular', '06-socio-tenis')
+  await p.context().close()
+
+  const n = await abrir(390, 844, 3)
+  await n.locator('[name=dni]').fill('99123757')
+  await n.getByRole('button', { name: 'Continuar' }).click()
+  await teclear(n, '123757')
+  await n.waitForSelector('text=Crea tu PIN personal')
+  await foto(n, 'celular', '07-socio-crear-pin')
+  await n.context().close()
+
+  const a = await abrir(390, 844, 3)
+  await entrar(a, 'admin', 'Admin2026')
+  await foto(a, 'celular', '08-admin-inicio')
+  await ir(a, 'barra', '.tabbar')
+  const prod = a.locator('#productos .producto:not([disabled])')
+  await prod.nth(0).click(); await prod.nth(4).click()
+  await foto(a, 'celular', '09-admin-barra')
+  await ir(a, 'porteria', '.tabbar')
+  await a.locator('#buscarSocio').fill('Peralta Ugaz')
+  await a.waitForSelector('#resultados article')
+  await foto(a, 'celular', '10-porteria-busqueda')
+  await a.context().close()
+}
+
+await navegador.close()
+console.log(hechas.length + ' capturas listas en ' + salida)

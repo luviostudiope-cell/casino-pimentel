@@ -21,3 +21,6 @@ playwright-report/
 appscript/dev/datos-locales.json
 appscript/capturas/
 .clasprc.json
+
+# Entregables locales (kit de presentación, accesos)
+entregables/

@@ -10,8 +10,15 @@ import { fileURLToPath } from 'node:url'
 
 const aqui = dirname(fileURLToPath(import.meta.url))
 const src = join(aqui, '..', 'src')
-const archivoDatos = join(aqui, 'datos-locales.json')
+const archivoDatos = process.env.DATOS || join(aqui, 'datos-locales.json')
 const PUERTO = Number(process.env.PUERTO || 3000)
+// AHORA=2026-11-02T18:30:00-05:00 simula esa fecha y hora (útil para capturas con datos de un día completo)
+const AHORA = process.env.AHORA ? new Date(process.env.AHORA).getTime() : null
+const arranque = Date.now()
+class FechaSimulada extends Date {
+  constructor(...a) { if (a.length === 0) super(AHORA + (Date.now() - arranque)); else super(...a) }
+  static now() { return AHORA + (Date.now() - arranque) }
+}
 const ORDEN = ['Datos.js', 'Sesion.js', 'Api.js', 'Instalar.js', 'Codigo.js']
 
 // ---------- Estado persistente (hojas y propiedades) ----------
@@ -88,6 +95,7 @@ function formatoFecha(fecha, zona, patron) {
 
 const entorno = {
   console,
+  ...(AHORA ? { Date: FechaSimulada } : {}),
   SpreadsheetApp: { openById: () => libro, getActiveSpreadsheet: () => null, create: () => libro, flush() {} },
   PropertiesService: {
     getScriptProperties: () => ({
