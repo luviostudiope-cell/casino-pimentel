@@ -1,5 +1,55 @@
 # Casino de Pimentel · Plataforma del club
 
+## El sistema que se usa hoy
+
+El sistema del club funciona en **Google Apps Script** con **Google Sheets** como base de datos (carpeta [`appscript/`](appscript/README.md)).
+
+| Qué | Dónde |
+|---|---|
+| Dirección corta (Vercel) | https://casino-pimentel.vercel.app |
+| Web app en Google | https://script.google.com/macros/s/AKfycbyIuh872nN7qy3mP9R3z6mOwbKDSsZkpSzU7OVp17ypTo8J34uEkT1TSh-MBw_ixb9L/exec |
+| Accesos de prueba | [ACCESOS.md](ACCESOS.md) |
+| Fases del proyecto | [FASES.md](FASES.md) |
+| Página de entrada de Vercel | [`vercel/`](vercel/README.md) |
+
+### Trabajar desde otra computadora
+
+1. Instala **Node 22 o superior** y **Git**.
+2. Clona el repositorio y entra al sistema:
+   ```bash
+   git clone https://github.com/luviostudiope-cell/casino-pimentel.git
+   ```
+   ```bash
+   cd casino-pimentel
+   ```
+   ```bash
+   npm install
+   ```
+   ```bash
+   npm install --prefix appscript
+   ```
+3. Míralo en esa computadora (queda en http://localhost:3000, con datos de ejemplo propios):
+   ```bash
+   node appscript/dev/servidor.mjs
+   ```
+4. Para subir cambios a Google, inicia sesión con la cuenta dueña del sistema (luviostudiope@gmail.com) y publica en el mismo enlace:
+   ```bash
+   cd appscript
+   ```
+   ```bash
+   npx clasp login
+   ```
+   ```bash
+   npx clasp push --force
+   ```
+   ```bash
+   npx clasp create-deployment -i AKfycbyIuh872nN7qy3mP9R3z6mOwbKDSsZkpSzU7OVp17ypTo8J34uEkT1TSh-MBw_ixb9L -d "descripción del cambio"
+   ```
+
+---
+
+## Versión con Supabase (para más adelante)
+
 Un solo sistema para el club: **web pública**, **panel de administración**, **tablet de barra El Astillero**, **tablet de portería con asistencia** y **app del socio**, sobre una sola base de datos en Supabase y un solo inicio de sesión.
 
 | Parte | Ruta | Tecnología |
