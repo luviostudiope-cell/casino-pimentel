@@ -95,3 +95,87 @@ Registro paso a paso de la construcción del sistema, para el caso de éxito. Ho
 
 **Cifras a esta hora**
 - 4 módulos + web · 13 secciones del panel · 5 Edge Functions · 18 capturas del después (web y sistema de diseño en 3 tamaños).
+
+---
+
+## PASO 11 · El ingreso que no dejaba entrar — 30-oct-2026, 20:00
+
+**Qué pasó**
+- El cliente intentó entrar y el teclado del PIN no respondía: la base de datos no estaba conectada. Se corrigió para que avise en español ("la base de datos del club aún no está conectada") y no seleccione texto al tocar rápido.
+
+**Lección**
+- La plataforma estaba completa, pero para el cliente era "una demo": no podía entrar con ningún usuario.
+
+Captura: `entregables/proceso-antes-despues/02-primera-plataforma-sin-base/02-app-ingreso-sin-base-de-datos.png`.
+
+---
+
+## PASO 12 · Cambio a Google Apps Script — 1-nov-2026 (publicado a las 16:20)
+
+**Qué se hizo**
+- A pedido del cliente, el sistema se rehízo en **Google Apps Script + Google Sheets**: gratis, funcional y con acceso inmediato. Supabase y la web quedaron para después.
+- Fases por módulo, desde portería: portería con asistencia, socios y cuotas, barra con stock, caja con cierre, personal, tenis, alquileres, avisos y la cuenta del socio.
+- Una hoja de cálculo como base de datos (una pestaña por tabla), claves y PIN cifrados con sal, sesiones de 6 horas y bloqueo tras 5 intentos.
+- Un servidor local que imita Google para probar todo en `localhost:3000` y una prueba automática que recorre cada rol.
+
+**Problemas y soluciones**
+- El enlace publicado respondía "Necesitas acceso": faltaba que el dueño autorizara el proyecto. Se redujeron los permisos a solo Google Sheets y el cliente lo autorizó desde el editor.
+
+Capturas: `03-primer-sistema-en-google/` (31 pantallas).
+
+---
+
+## PASO 13 · Rediseño con la estética del club — 1-nov-2026 (listo a las 23:10)
+
+**Qué pidió el cliente** (con capturas del sistema y una referencia de diseño minimalista y redondeada)
+- Fondos azules que impacten, colores del logo real, tipografía más legible y títulos más grandes.
+- Nada cuadrado: calendario y horas propios, opciones en píldoras celestes con animación.
+- Una explicación de cómo funciona cada sección.
+- Tickets imprimibles (no boletas) y una app del socio más personal.
+
+**Qué se hizo**
+- Menú azul, encabezados azules con olas y el sol del logo, tipografías Outfit y Plus Jakarta Sans.
+- Botón "Cómo funciona" con los pasos en cada sección y accesos rápidos en el inicio.
+- Ticket de venta, recibo de cuotas y ticket de invitado para impresora térmica de 80 mm.
+- App del socio con saludo, carnet con QR, cuotas y reservas.
+
+Capturas: `04-rediseno-estetica-del-club/` (45 pantallas). Comparación: `antes-despues/07-diseno.png` y `08-app-del-socio.png`.
+
+---
+
+## PASO 14 · Publicación — 1-nov-2026, 23:20 a 23:40
+
+- Código en GitHub (repositorio público por decisión del cliente) y dirección corta en Vercel: https://casino-pimentel.vercel.app.
+- Problema: quien tenía varias cuentas de Google abiertas veía "No se pudo abrir el archivo". Se resolvió abriendo el sistema como visitante dentro de la página de Vercel.
+
+Capturas: `05-publicacion/`.
+
+---
+
+## PASO 15 · Kit de presentación — 2-nov-2026, 00:00 a 00:15
+
+- Capturas a doble resolución simulando el lunes 2 de noviembre a las 6:30 p. m., mockups en laptop, tablet y celular, marca, contenido del sistema y prompt para armar las diapositivas.
+
+Capturas: `06-kit-de-presentacion/`.
+
+---
+
+## PASO 16 · Correcciones con el formulario del club — 2-nov-2026 (publicado a las 13:10)
+
+**Qué se encontró**
+- El socio del cliente avisó que no hay 2 canchas de tenis. Revisando el origen: el dato venía de la investigación inicial, no del formulario del club. El formulario dice 1 cancha de tenis y 1 de básquet.
+
+**Qué se corrigió**
+- Tenis: 1 cancha y máximo 3 reservas por socio a la semana (además de 1 por día).
+- Invitados al comedor sin costo (no pasan por caja).
+- Adicional de cocina de S/ 400 para el rincón parrillero.
+- Barra: consumo "a la cuenta" del socio, con ticket firmado; administración lo cobra después y entra a la caja.
+- La base publicada se actualiza sola al subir la versión (versión 7 en Google).
+
+**Por confirmar con el club**
+- Monto de la cuota (S/ 80 de prueba) y día de vencimiento (día 10), cancha de fútbol, si el básquet se reserva y quién de la familia reserva tenis.
+
+**Cifras**
+- 20 de 20 reglas verificadas · recorrido completo sin errores · 51 capturas del sistema final.
+
+Capturas: `07-correcciones-del-club/` y `08-sistema-final/`. Comparación: `antes-despues/10-reglas-del-club.png`.

@@ -13,7 +13,7 @@ Documento vivo. Registra el antes, la construcción y el después del sistema de
 ### Quién es el cliente
 - Club social privado frente al malecón de Pimentel, con actividad tributaria desde 1984 (asociación).
 - 265 socios titulares con sus familias.
-- Instalaciones: piscina, 2 canchas de tenis, básquet, el bar El Astillero (2 barras), salón principal, rincón parrillero, jardín y deck.
+- Instalaciones: piscina, 1 cancha de tenis, 1 de básquet, el bar El Astillero (2 barras), salón principal, comedor, rincón parrillero, jardín y deck. (La investigación inicial decía 2 canchas de tenis; el formulario del club lo corrigió el 2-nov-2026.)
 - Personal: unos 10-11 en planilla y de 10 a 30 por recibo por honorarios, más en verano.
 
 ### Cómo funcionaba (evidencia en `antes/`)
@@ -54,15 +54,50 @@ Sin estas cifras, el "después" no tiene contra qué compararse.
 | 28-oct-2026 | El presidente confirma el interés y pide un sistema integrado. |
 | 29-oct-2026 | Llega la información del club: carta, insumos, formatos, tarifas, reglas de socios, invitados y tenis. |
 | 29-oct-2026 | Brief del sistema y prompt de construcción: una sola plataforma con web pública, panel, barra, portería con asistencia, app del socio, notificaciones y reporte diario. |
-| (pendiente) | Construcción: Claude Code registra cada paso en `caso-de-exito/bitacora-construccion.md`. |
-| (pendiente) | Presentación al club. |
-| (pendiente) | Puesta en marcha. |
+| 30-oct-2026 | Primera plataforma: web pública en Astro (publicada), app en React y base de datos en Supabase con 38 pruebas superadas en local. La base no se llegó a conectar (el proyecto de Supabase tenía costo), así que **nadie podía entrar**. |
+| 1-nov-2026, 14:30 | Cambio de rumbo pedido por el cliente: el sistema se rehace en **Google Apps Script + Google Sheets**, funcional y a costo S/ 0. A las 16:20 queda publicado en Google. |
+| 1-nov-2026, 23:10 | **Rediseño** con el logo y los colores reales del club, a partir de los comentarios del cliente: fondos azules, títulos grandes, ayuda "Cómo funciona" en cada sección, calendario y horas propios, tickets imprimibles y una app del socio personalizada. |
+| 1-nov-2026, 23:40 | Publicación con dirección corta en Vercel (casino-pimentel.vercel.app) y código en GitHub. |
+| 2-nov-2026, 00:10 | Kit de presentación: capturas, mockups en laptop, tablet y celular, marca y prompt para armar las diapositivas. |
+| 2-nov-2026, 13:00 | **Correcciones con el formulario del club**: 1 cancha de tenis (no 2), máximo 3 reservas por semana, invitados al comedor sin costo, adicional de cocina de S/ 400 y consumos de la barra a la cuenta del socio. Publicado como versión 7. |
+| 2-nov-2026 | Presentación de la propuesta al club. |
+| (pendiente) | Puesta en marcha con datos reales. |
 
-## 3. El después (se llena al terminar)
-- Capturas de cada pantalla en celular, tablet y escritorio: `caso-de-exito/despues/`.
-- Videos de los flujos clave: cobrar en barra, escanear el carnet en portería, reservar tenis, cierre del día.
-- Números del sistema: tablas, pantallas, reglas automatizadas, pruebas superadas.
+## 3. El después
+
+### Material
+Todo está en `entregables/proceso-antes-despues/` (carpeta local, no se sube a GitHub por su peso: 85 MB):
+
+| Carpeta | Qué muestra |
+|---|---|
+| `01-antes-papel-y-excel` | Comanda, kardex, talonario de portería, cartas y tarifas del club (sin los archivos PRIVADO) |
+| `02-primera-plataforma-sin-base` | Sistema de diseño, web pública y el ingreso que no dejaba entrar |
+| `03-primer-sistema-en-google` | Las 31 pantallas de la primera versión funcional, antes del rediseño |
+| `04-rediseno-estetica-del-club` | Las 45 pantallas del rediseño, tal como se presentaron (con las reglas antes de corregir) |
+| `05-publicacion` | Vercel, el sistema publicado en Google y la marca |
+| `06-kit-de-presentacion` | Mockups del kit |
+| `07-correcciones-del-club` | Tenis antes y después, y las funciones nuevas |
+| `08-sistema-final` | Las 51 pantallas del sistema publicado hoy |
+| `antes-despues` | 10 composiciones listas para publicar (1920 × 1080) y su PDF |
+
+Las composiciones se rehacen con `node appscript/dev/antes-despues.mjs entregables/proceso-antes-despues`.
+
+### Lo que el club tiene hoy
+- Un solo sistema con un solo ingreso para administración, directiva, portería, barra y socios, en celular, tablet y computadora.
+- 8 módulos: portería con asistencia del personal, socios y cuotas, barra con stock, caja con cierre, personal, tenis, alquileres de ambientes y avisos, más la app del socio con carnet QR.
+- La carta real de 55 productos, las tarifas reales de los ambientes y las reglas del formulario del club.
+- 4 documentos impresos en 80 mm: ticket de venta, recibo de cuotas, recibo de consumos y ticket de invitado.
+- Costo de funcionamiento hoy: S/ 0 (Google, Vercel y GitHub en planes gratuitos).
+- Pruebas: recorrido completo por todas las pantallas sin errores y 20 de 20 reglas del club verificadas.
+
+### Por medir
+- Videos de los flujos clave: cobrar en barra, portería, reservar tenis, cierre de caja.
 - Comparación con la línea base, después de 30 días de uso.
+
+## Lo que aprendimos en el proceso
+1. **Una demo en la que no se puede entrar no convence.** La primera plataforma era completa, pero sin base de datos conectada el cliente no podía probar nada. Pasar a Google permitió tener el sistema funcionando y gratis el mismo día.
+2. **La identidad del cliente cambia la percepción.** La primera versión funcional se veía genérica; con el logo, los colores y la ayuda en cada sección se sintió como "el sistema del club".
+3. **Los datos se validan con el cliente, no solo con investigación.** Las 2 canchas de tenis venían de la investigación pública; el formulario del club dijo 1. Desde ahí, lo que no está confirmado se marca "por confirmar" (cuota, día de vencimiento, cancha de fútbol, básquet).
 
 ## 4. Ideas para el post de LinkedIn (borrador de enfoque)
 - Gancho: un club que ya había pagado por un sistema que nunca terminó.
