@@ -342,7 +342,7 @@ function registrarInvitado_(d, ses) {
       monto: monto, medio: medio, referencia: ing.id, registrado_por: quien_(ses), es_ejemplo: false,
     });
   }
-  return { hora: hora, monto: monto, nombre: nombre };
+  return { fecha: hoy, hora: hora, monto: monto, nombre: nombre, dni: dni, anfitrion: nombreSocio_(s), codigo: s.codigo, entrada: tipoTarifa, medio: MEDIOS[medio] || '', atendido: quien_(ses) };
 }
 
 function registrarSalida_(d) {
@@ -533,7 +533,7 @@ function registrarPago_(d, ses) {
     monto: total, medio: medio, referencia: pago.id, registrado_por: quien_(ses), es_ejemplo: false,
   });
   anotar_(ses, 'Registró pago de cuotas', nombreSocio_(s) + ' S/ ' + total);
-  return { total: total, meses: periodos.map(mesLegible_) };
+  return { total: total, meses: periodos.map(mesLegible_), fecha: hoy, hora: hora, socio: nombreSocio_(s), codigo: s.codigo, medio: MEDIOS[medio], numero: pago.id.slice(0, 6).toUpperCase(), atendido: quien_(ses) };
 }
 
 function generarCuotas_(d, ses) {
@@ -608,7 +608,7 @@ function registrarVenta_(d, ses) {
     fecha: hoy, hora: hora, tipo: 'ingreso', origen: 'barra', concepto: 'Venta de barra N° ' + numero, monto: total, medio: medio,
     referencia: v.id, registrado_por: quien_(ses), es_ejemplo: false,
   });
-  return { numero: numero, total: total };
+  return { numero: numero, total: total, fecha: hoy, hora: hora, items: items, medio: MEDIOS[medio], mesa: v.mesa, atendido: quien_(ses) };
 }
 
 function anularVenta_(d, ses) {
