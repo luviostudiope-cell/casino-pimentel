@@ -15,7 +15,7 @@ const ACCIONES = {
   cambiarClave: { roles: ['admin', 'directiva', 'porteria', 'barra'], escribe: true },
   resumenInicio: { roles: R_DIRECCION },
   porteriaHoy: { roles: R_PUERTA },
-  buscarSocios: { roles: R_PUERTA },
+  buscarSocios: { roles: ['porteria', 'admin', 'directiva', 'barra'] },
   registrarIngreso: { roles: ['porteria', 'admin'], escribe: true },
   registrarInvitado: { roles: ['porteria', 'admin'], escribe: true },
   registrarSalida: { roles: ['porteria', 'admin'], escribe: true },
@@ -26,6 +26,7 @@ const ACCIONES = {
   guardarSocio: { roles: ['admin'], escribe: true },
   cambiarEstadoSocio: { roles: ['admin'], escribe: true },
   registrarPago: { roles: ['admin'], escribe: true },
+  cobrarConsumos: { roles: ['admin'], escribe: true },
   generarCuotas: { roles: ['admin'], escribe: true },
   reiniciarPinSocio: { roles: ['admin'], escribe: true },
   barraHoy: { roles: ['barra', 'admin', 'directiva'] },
@@ -88,24 +89,50 @@ function api(accion, token, datos) {
   }
 }
 
+// Sube este número cuando cambien las tablas o los datos de ejemplo: al publicar, el sistema se actualiza solo.
+const VERSION_DATOS = '2';
+
 function asegurarInstalacion_() {
   const props = PropertiesService.getScriptProperties();
-  if (props.getProperty('INSTALADO')) return;
+  if (props.getProperty('INSTALADO') && props.getProperty('VERSION_DATOS') === VERSION_DATOS) return;
   const candado = LockService.getScriptLock();
   candado.waitLock(30000);
   try {
     if (!props.getProperty('INSTALADO')) {
       instalar_();
       props.setProperty('INSTALADO', new Date().toISOString());
+    } else if (props.getProperty('VERSION_DATOS') !== VERSION_DATOS) {
+      actualizarEsquema_();
+      if (config_().datos_de_ejemplo === 'SI') {
+        Object.keys(TABLAS).forEach(function (t) { if (t !== 'Config') vaciar_(t); });
+        cargarEjemplo_();
+      }
     }
+    props.setProperty('VERSION_DATOS', VERSION_DATOS);
   } finally {
     candado.releaseLock();
   }
 }
 
+/** Pone al día los encabezados de las hojas y agrega las reglas nuevas a Config. */
+function actualizarEsquema_() {
+  Object.keys(TABLAS).forEach(function (t) {
+    const cols = TABLAS[t];
+    const h = hoja_(t);
+    const actual = h.getRange(1, 1, 1, cols.length).getValues()[0];
+    if (actual.join('|') !== cols.join('|')) {
+      h.getRange(1, 1, h.getMaxRows(), cols.length).setNumberFormat('@');
+      h.getRange(1, 1, 1, cols.length).setValues([cols]).setFontWeight('bold').setBackground('#EAF4FB');
+    }
+  });
+  const existentes = leer_('Config').map(function (f) { return f.clave; });
+  insertarVarios_('Config', CONFIG_POR_DEFECTO.filter(function (f) { return existentes.indexOf(f[0]) < 0; })
+    .map(function (f) { return { clave: f[0], valor: f[1], descripcion: f[2] }; }));
+}
+
 // ---------- Utilidades comunes ----------
 
-const MEDIOS = { efectivo: 'Efectivo', yape: 'Yape', plin: 'Plin', tarjeta: 'Tarjeta', transferencia: 'Transferencia' };
+const MEDIOS = { efectivo: 'Efectivo', yape: 'Yape', plin: 'Plin', tarjeta: 'Tarjeta', transferencia: 'Transferencia', cuenta: 'A la cuenta del socio' };
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
 function quien_(ses) { return ses ? (ses.usuario || ses.nombre) : 'sistema'; }
@@ -114,8 +141,8 @@ function mesLegible_(periodo) {
   const p = String(periodo).split('-');
   return MESES[Number(p[1]) - 1] + ' ' + p[0];
 }
-function validarMedio_(medio) {
-  if (!MEDIOS[medio]) throw new Error('Elige cómo pagó: efectivo, Yape, Plin, tarjeta o transferencia.');
+function validarMedio_(medio, permitirCuenta) {
+  if (!MEDIOS[medio] || (medio === 'cuenta' && !permitirCuenta)) throw new Error('Elige cómo pagó: efectivo, Yape, Plin, tarjeta o transferencia.');
   return medio;
 }
 function validarMonto_(monto, etiqueta) {
@@ -207,6 +234,9 @@ function resumenInicio_() {
   }
   const mes = hoy.slice(0, 7);
   const cobradoMes = sumar_(leer_('Pagos').filter(function (p) { return p.fecha.slice(0, 7) === mes; }), 'monto');
+  const aCuenta = leer_('Ventas').filter(function (v) { return v.estado === 'a_cuenta'; });
+  const sociosACuenta = {};
+  aCuenta.forEach(function (v) { sociosACuenta[v.socio_id] = 1; });
 
   return {
     hoy: hoy,
@@ -217,6 +247,7 @@ function resumenInicio_() {
     caja: { ingresos: redondear_(entra), egresos: redondear_(sale), saldo: redondear_(entra - sale) },
     socios: { total: socios.length, alDia: alDia, deuda: redondear_(deuda), morosos: morosos },
     cobradoMes: redondear_(cobradoMes),
+    consumosACuenta: { total: redondear_(sumar_(aCuenta, 'total')), socios: Object.keys(sociosACuenta).length },
     stockBajo: stockBajo,
     noMarcaron: noMarcaron.map(function (p) { return { nombre: p.nombre, horario: p.horario }; }),
     presentes: asistencia.personal.filter(function (p) { return p.estado === 'presente'; }).length,
@@ -241,7 +272,7 @@ function porteriaHoy_() {
     dentro: ing.filter(function (i) { return !i.salida; }).length,
     total: ing.length,
     invitados: ing.filter(function (i) { return i.tipo === 'invitado'; }).length,
-    tarifas: { club: Number(c.tarifa_invitado_club), piscina: Number(c.tarifa_invitado_piscina) },
+    tarifas: { club: Number(c.tarifa_invitado_club), piscina: Number(c.tarifa_invitado_piscina), comedor: Number(c.tarifa_invitado_comedor) || 0 },
     bloquearMorosos: c.bloquear_morosos === 'SI',
     ingresos: ing.map(function (i) {
       const s = socios[i.socio_id];
@@ -328,8 +359,8 @@ function registrarInvitado_(d, ses) {
   const mes = hoy.slice(0, 7);
   const visitas = todos.filter(function (i) { return i.dni === dni && i.fecha.slice(0, 7) === mes; }).length;
   if (visitas >= Number(c.max_visitas_invitado_mes)) throw new Error('Este invitado ya vino ' + visitas + ' veces este mes. El máximo es ' + c.max_visitas_invitado_mes + '.');
-  const tipoTarifa = d.tarifa === 'piscina' ? 'piscina' : 'club';
-  const monto = Number(tipoTarifa === 'piscina' ? c.tarifa_invitado_piscina : c.tarifa_invitado_club) || 0;
+  const tipoTarifa = ['club', 'piscina', 'comedor'].indexOf(d.tarifa) >= 0 ? d.tarifa : 'club';
+  const monto = Number(c['tarifa_invitado_' + tipoTarifa]) || 0;
   const medio = monto > 0 ? validarMedio_(d.medio) : '';
   const hora = horaAhora_();
   const ing = insertar_('Ingresos', {
@@ -433,6 +464,11 @@ function verSocio_(d) {
     .sort(function (a, b) { return a.fecha + a.hora < b.fecha + b.hora ? 1 : -1; }).slice(0, 8)
     .map(function (i) { return { fecha: i.fecha, hora: i.hora, tipo: i.tipo, nombre: i.nombre }; });
   const r = resumenSocio_(s, cuentaDe_(cuotasPorSocio_()[s.id], hoy));
+  const consumos = leer_('Ventas').filter(function (v) { return v.socio_id === s.id && v.estado === 'a_cuenta'; })
+    .sort(function (a, b) { return a.fecha + a.hora < b.fecha + b.hora ? 1 : -1; })
+    .map(function (v) { return { id: v.id, numero: v.numero, fecha: v.fecha, hora: v.hora, total: v.total, resumen: (v.items || []).map(function (i) { return i.cant + '× ' + i.nombre; }).join(', ') }; });
+  r.consumos = consumos;
+  r.consumosTotal = redondear_(sumar_(consumos, 'total'));
   r.fecha_nacimiento = s.fecha_nacimiento;
   r.fecha_ingreso = s.fecha_ingreso;
   r.debeCambiarPin = s.debe_cambiar_pin;
@@ -536,6 +572,28 @@ function registrarPago_(d, ses) {
   return { total: total, meses: periodos.map(mesLegible_), fecha: hoy, hora: hora, socio: nombreSocio_(s), codigo: s.codigo, medio: MEDIOS[medio], numero: pago.id.slice(0, 6).toUpperCase(), atendido: quien_(ses) };
 }
 
+function cobrarConsumos_(d, ses) {
+  const s = buscarPorId_('Socios', d.socio_id);
+  if (!s) throw new Error('No se encontró al socio.');
+  const lista = leer_('Ventas').filter(function (v) { return v.socio_id === s.id && v.estado === 'a_cuenta'; });
+  if (!lista.length) throw new Error('Este socio no tiene consumos a cuenta por cobrar.');
+  const medio = validarMedio_(d.medio);
+  const total = redondear_(sumar_(lista, 'total'));
+  const hoy = hoy_();
+  const hora = horaAhora_();
+  lista.forEach(function (v) { actualizar_('Ventas', v.id, { estado: 'pagada' }); });
+  const numeros = lista.map(function (v) { return v.numero; }).sort(function (a, b) { return a - b; });
+  insertar_('Caja', {
+    fecha: hoy, hora: hora, tipo: 'ingreso', origen: 'barra', concepto: 'Consumos a cuenta de ' + nombreSocio_(s) + ' (N° ' + numeros.join(', ') + ')',
+    monto: total, medio: medio, referencia: s.id, registrado_por: quien_(ses), es_ejemplo: false,
+  });
+  anotar_(ses, 'Cobró consumos a cuenta', nombreSocio_(s) + ' S/ ' + total);
+  return {
+    total: total, fecha: hoy, hora: hora, socio: nombreSocio_(s), codigo: s.codigo, medio: MEDIOS[medio], atendido: quien_(ses),
+    lineas: lista.map(function (v) { return { numero: v.numero, fecha: v.fecha, total: v.total }; }),
+  };
+}
+
 function generarCuotas_(d, ses) {
   const periodo = /^\d{4}-\d{2}$/.test(String(d.periodo || '')) ? d.periodo : hoy_().slice(0, 7);
   const existentes = {};
@@ -560,6 +618,7 @@ function barraHoy_(d, ses) {
     .map(function (p) {
       return { id: p.id, categoria: p.categoria, nombre: p.nombre, detalle: p.detalle, precio: p.precio, stock: p.stock, minimo: p.stock_minimo, controla: p.stock_minimo >= 0, activo: p.activo, porConfirmar: p.por_confirmar };
     });
+  const socios = mapaPorId_(leer_('Socios'));
   const ventas = leer_('Ventas').filter(function (v) { return v.fecha === hoy; })
     .sort(function (a, b) { return b.numero - a.numero; });
   const validas = ventas.filter(function (v) { return v.estado !== 'anulada'; });
@@ -570,7 +629,8 @@ function barraHoy_(d, ses) {
     categorias: CATEGORIAS_BARRA,
     productos: productos,
     ventas: ventas.map(function (v) {
-      return { id: v.id, numero: v.numero, hora: v.hora, items: v.items || [], total: v.total, medio: MEDIOS[v.medio] || v.medio, mesa: v.mesa, atendido: v.atendido_por, estado: v.estado };
+      const s = socios[v.socio_id];
+      return { id: v.id, numero: v.numero, hora: v.hora, items: v.items || [], total: v.total, medio: MEDIOS[v.medio] || v.medio, mesa: v.mesa, atendido: v.atendido_por, estado: v.estado, socio: s ? nombreSocio_(s) : '', codigo: s ? s.codigo : '' };
     }),
     total: redondear_(sumar_(validas, 'total')),
     cantidad: validas.length,
@@ -581,7 +641,13 @@ function barraHoy_(d, ses) {
 
 function registrarVenta_(d, ses) {
   if (!Array.isArray(d.items) || !d.items.length) throw new Error('El pedido está vacío.');
-  const medio = validarMedio_(d.medio);
+  const medio = validarMedio_(d.medio, true);
+  let socio = null;
+  if (medio === 'cuenta') {
+    socio = buscarPorId_('Socios', d.socio_id);
+    if (!socio) throw new Error('Busca y elige al socio que carga el consumo a su cuenta.');
+    if (socio.estado !== 'activo') throw new Error('Ese socio no está activo; no se puede cargar a su cuenta.');
+  }
   const prods = mapaPorId_(leer_('Productos'));
   let total = 0;
   const items = d.items.map(function (it) {
@@ -598,23 +664,27 @@ function registrarVenta_(d, ses) {
   const numero = leer_('Ventas').reduce(function (m, v) { return Math.max(m, v.numero); }, 0) + 1;
   const v = insertar_('Ventas', {
     numero: numero, fecha: hoy, hora: hora, items: items, total: total, medio: medio, mesa: String(d.mesa || '').slice(0, 20),
-    atendido_por: quien_(ses), estado: 'pagada', es_ejemplo: false,
+    atendido_por: quien_(ses), estado: socio ? 'a_cuenta' : 'pagada', es_ejemplo: false, socio_id: socio ? socio.id : '',
   });
   items.forEach(function (it) {
     const p = prods[it.id];
     if (p.stock_minimo >= 0) actualizar_('Productos', p.id, { stock: p.stock - it.cant });
   });
-  insertar_('Caja', {
-    fecha: hoy, hora: hora, tipo: 'ingreso', origen: 'barra', concepto: 'Venta de barra N° ' + numero, monto: total, medio: medio,
-    referencia: v.id, registrado_por: quien_(ses), es_ejemplo: false,
-  });
-  return { numero: numero, total: total, fecha: hoy, hora: hora, items: items, medio: MEDIOS[medio], mesa: v.mesa, atendido: quien_(ses) };
+  // Lo cargado a la cuenta del socio no entra a caja hasta que lo paga
+  if (!socio) {
+    insertar_('Caja', {
+      fecha: hoy, hora: hora, tipo: 'ingreso', origen: 'barra', concepto: 'Venta de barra N° ' + numero, monto: total, medio: medio,
+      referencia: v.id, registrado_por: quien_(ses), es_ejemplo: false,
+    });
+  }
+  return { numero: numero, total: total, fecha: hoy, hora: hora, items: items, medio: MEDIOS[medio], mesa: v.mesa, atendido: quien_(ses), socio: socio ? nombreSocio_(socio) : '', codigo: socio ? socio.codigo : '' };
 }
 
 function anularVenta_(d, ses) {
   const v = buscarPorId_('Ventas', d.id);
   if (!v) throw new Error('No se encontró la venta.');
   if (v.estado === 'anulada') throw new Error('Esta venta ya estaba anulada.');
+  if (v.medio === 'cuenta' && v.estado === 'pagada') throw new Error('Este consumo a cuenta ya se cobró al socio; no se puede anular.');
   const motivo = String(d.motivo || '').trim();
   if (motivo.length < 4) throw new Error('Escribe el motivo de la anulación.');
   actualizar_('Ventas', v.id, { estado: 'anulada' });
@@ -623,10 +693,12 @@ function anularVenta_(d, ses) {
     const p = prods[it.id];
     if (p && p.stock_minimo >= 0) actualizar_('Productos', p.id, { stock: p.stock + it.cant });
   });
-  insertar_('Caja', {
-    fecha: hoy_(), hora: horaAhora_(), tipo: 'egreso', origen: 'barra', concepto: 'Anulación de venta N° ' + v.numero + ': ' + motivo,
-    monto: v.total, medio: v.medio, referencia: v.id, registrado_por: quien_(ses), es_ejemplo: false,
-  });
+  if (v.estado !== 'a_cuenta') {
+    insertar_('Caja', {
+      fecha: hoy_(), hora: horaAhora_(), tipo: 'egreso', origen: 'barra', concepto: 'Anulación de venta N° ' + v.numero + ': ' + motivo,
+      monto: v.total, medio: v.medio, referencia: v.id, registrado_por: quien_(ses), es_ejemplo: false,
+    });
+  }
   anotar_(ses, 'Anuló venta de barra', 'N° ' + v.numero + ' · ' + motivo);
   return true;
 }
@@ -776,7 +848,18 @@ function guardarTrabajador_(d, ses) {
 
 // ---------- Reservas de tenis ----------
 
-const CANCHAS = ['Tenis 1', 'Tenis 2'];
+// El club tiene una cancha de tenis (la única que se reserva) y una de básquet de uso libre.
+const CANCHAS = ['Tenis'];
+
+function inicioSemana_(fecha) {
+  const p = fecha.split('-').map(Number);
+  const dia = (new Date(Date.UTC(p[0], p[1] - 1, p[2], 12)).getUTCDay() + 6) % 7;
+  return fechaMas_(fecha, -dia);
+}
+function reservasSemana_(socioId, fecha) {
+  const desde = inicioSemana_(fecha), hasta = fechaMas_(desde, 6);
+  return leer_('Reservas').filter(function (r) { return r.socio_id === socioId && r.estado === 'reservada' && r.fecha >= desde && r.fecha <= hasta; }).length;
+}
 
 function reservasDia_(d, ses) {
   const hoy = hoy_();
@@ -794,7 +877,11 @@ function reservasDia_(d, ses) {
     const s = socios[r.socio_id];
     return { id: r.id, hora: r.hora, cancha: r.cancha, mia: mia, socio: ses.rol === 'socio' ? (mia ? 'Tu reserva' : 'Ocupado') : nombreSocio_(s) };
   });
-  return { fecha: fecha, hoy: hoy, ahora: horaAhora_(), dias: dias, horas: horas, canchas: CANCHAS, reservas: reservas, puedeElegirSocio: ses.rol !== 'socio' };
+  const maxSemana = Number(c.tenis_max_semana) || 3;
+  return {
+    fecha: fecha, hoy: hoy, ahora: horaAhora_(), dias: dias, horas: horas, canchas: CANCHAS, reservas: reservas, puedeElegirSocio: ses.rol !== 'socio',
+    maxDia: Number(c.tenis_max_dia) || 1, maxSemana: maxSemana, quedanSemana: ses.rol === 'socio' ? Math.max(0, maxSemana - reservasSemana_(ses.id, fecha)) : null,
+  };
 }
 
 function reservar_(d, ses) {
@@ -814,6 +901,8 @@ function reservar_(d, ses) {
   if (todas.some(function (r) { return r.hora === hora && r.cancha === d.cancha; })) throw new Error('Ese horario ya fue tomado. Elige otro.');
   const suyas = todas.filter(function (r) { return r.socio_id === s.id; }).length;
   if (suyas >= Number(c.tenis_max_dia)) throw new Error(ses.rol === 'socio' ? 'Ya tienes una reserva ese día.' : 'Ese socio ya tiene una reserva ese día.');
+  const maxSemana = Number(c.tenis_max_semana) || 3;
+  if (reservasSemana_(s.id, fecha) >= maxSemana) throw new Error((ses.rol === 'socio' ? 'Ya tienes ' : 'Ese socio ya tiene ') + maxSemana + ' reservas esa semana (de lunes a domingo). El máximo es ' + maxSemana + '.');
   insertar_('Reservas', { fecha: fecha, hora: hora, cancha: d.cancha, socio_id: s.id, estado: 'reservada', creado_por: quien_(ses), es_ejemplo: false });
   return { socio: nombreSocio_(s) };
 }
@@ -837,6 +926,7 @@ const AMBIENTES = [
   { nombre: 'Piscina', grupo: 'piscina', tarifas: { socio: 500 }, garantia: 0, nota: 'Solo temporada baja' },
   { nombre: 'Deck', grupo: 'deck', tarifas: {}, garantia: 0, nota: 'Tarifa por confirmar' },
 ];
+const ADICIONAL_COCINA = { nombre: 'Uso de cocina (rincón parrillero)', precio: 400, grupo: 'parrilla' };
 const ESTADOS_ALQUILER = ['reservado', 'confirmado', 'realizado', 'cancelado'];
 
 function listarAlquileres_() {
@@ -844,7 +934,7 @@ function listarAlquileres_() {
   const lista = leer_('Alquileres').sort(function (a, b) { return a.fecha < b.fecha ? -1 : 1; }).map(function (a) {
     return { id: a.id, fecha: a.fecha, ambiente: a.ambiente, cliente: a.cliente, tipo: a.tipo_cliente, celular: a.celular, monto: a.monto, adelanto: a.adelanto, saldo: redondear_(a.monto - a.adelanto), estado: a.estado, nota: a.nota, pasado: a.fecha < hoy };
   });
-  return { hoy: hoy, alquileres: lista, ambientes: AMBIENTES };
+  return { hoy: hoy, alquileres: lista, ambientes: AMBIENTES, cocina: ADICIONAL_COCINA };
 }
 
 function guardarAlquiler_(d, ses) {
@@ -868,7 +958,12 @@ function guardarAlquiler_(d, ses) {
     return otro && otro.grupo === amb.grupo && (otro.completo || amb.completo);
   });
   if (choca) throw new Error('Ese día ya está reservado: ' + choca.ambiente + ' para ' + choca.cliente + '.');
-  const datos = { fecha: fecha, ambiente: amb.nombre, cliente: cliente, tipo_cliente: tipo, celular: celular, monto: monto, nota: String(d.nota || '').slice(0, 300) };
+  let nota = String(d.nota || '').trim();
+  if (d.cocina === 'si') {
+    if (amb.grupo !== ADICIONAL_COCINA.grupo) throw new Error('El uso de cocina es solo para el rincón parrillero.');
+    if (nota.indexOf('Incluye uso de cocina') < 0) nota = ('Incluye uso de cocina (S/ ' + ADICIONAL_COCINA.precio + '). ' + nota).trim();
+  }
+  const datos = { fecha: fecha, ambiente: amb.nombre, cliente: cliente, tipo_cliente: tipo, celular: celular, monto: monto, nota: nota.slice(0, 300) };
   if (d.id) {
     actualizar_('Alquileres', d.id, datos);
     anotar_(ses, 'Editó alquiler', amb.nombre + ' ' + fecha);
@@ -960,7 +1055,7 @@ function guardarAjustes_(d, ses) {
   const valores = d.valores || {};
   const h = hoja_('Config');
   const filas = leer_('Config');
-  const numericas = ['cuota_mensual', 'dia_vencimiento', 'tarifa_invitado_club', 'tarifa_invitado_piscina', 'max_invitados_dia', 'max_visitas_invitado_mes', 'tolerancia_tardanza', 'tenis_hora_inicio', 'tenis_hora_fin', 'tenis_max_dia', 'tenis_dias_anticipacion'];
+  const numericas = ['cuota_mensual', 'dia_vencimiento', 'tarifa_invitado_club', 'tarifa_invitado_piscina', 'tarifa_invitado_comedor', 'max_invitados_dia', 'max_visitas_invitado_mes', 'tolerancia_tardanza', 'tenis_hora_inicio', 'tenis_hora_fin', 'tenis_max_dia', 'tenis_max_semana', 'tenis_dias_anticipacion'];
   CONFIG_POR_DEFECTO.forEach(function (f) {
     const clave = f[0];
     if (!(clave in valores)) return;

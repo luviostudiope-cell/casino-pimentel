@@ -227,8 +227,9 @@ function cargarEjemplo_() {
   const botellas = productos.filter(function (p) { return p.categoria === 'Botellas' && p.precio <= 260; });
   const ventas = [];
   let numero = 1000;
-  const mediosBarra = ['efectivo', 'efectivo', 'yape', 'yape', 'plin', 'tarjeta'];
+  const mediosBarra = ['efectivo', 'efectivo', 'yape', 'yape', 'plin', 'tarjeta', 'tarjeta', 'cuenta'];
   const meseros = ['barra', 'barra', 'admin'];
+  const activos = socios.filter(function (s) { return s.estado === 'activo'; });
   for (let k = 6; k >= 0; k--) {
     const f = fechaMas_(hoy, -k);
     const n = entre(16, 32);
@@ -245,17 +246,24 @@ function cargarEjemplo_() {
         else items.push({ id: p.id, nombre: p.nombre, precio: p.precio, cant: p.precio <= 6 ? entre(1, 4) : 1 });
       }
       const total = items.reduce(function (a, x) { return a + x.precio * x.cant; }, 0);
-      const medio = elegir(mediosBarra);
+      // Los consumos a la cuenta del socio quedan por cobrar (solo en los últimos días) y no entran a caja
+      let medio = elegir(mediosBarra);
+      if (medio === 'cuenta' && k > 3) medio = 'efectivo';
       numero++;
-      const venta = { id: nuevoId_(), numero: numero, fecha: f, hora: hhmm_(h), items: items, total: total, medio: medio, mesa: String(entre(1, 14)), atendido_por: elegir(meseros), estado: 'pagada', es_ejemplo: true };
+      const aCuenta = medio === 'cuenta';
+      const venta = { id: nuevoId_(), numero: numero, fecha: f, hora: hhmm_(h), items: items, total: total, medio: medio, mesa: String(entre(1, 14)), atendido_por: elegir(meseros), estado: aCuenta ? 'a_cuenta' : 'pagada', es_ejemplo: true, socio_id: aCuenta ? elegir(activos.slice(2)).id : '' };
       ventas.push(venta);
-      caja.push({ fecha: f, hora: venta.hora, tipo: 'ingreso', origen: 'barra', concepto: 'Venta de barra N° ' + numero, monto: total, medio: medio, referencia: venta.id, registrado_por: venta.atendido_por, es_ejemplo: true });
+      if (!aCuenta) caja.push({ fecha: f, hora: venta.hora, tipo: 'ingreso', origen: 'barra', concepto: 'Venta de barra N° ' + numero, monto: total, medio: medio, referencia: venta.id, registrado_por: venta.atendido_por, es_ejemplo: true });
     });
   }
+  // Un consumo a cuenta del socio de demostración, para verlo en su app
+  const pisco = productos.find(function (p) { return p.nombre === 'Pisco Sour'; });
+  const agua = productos.find(function (p) { return p.nombre === 'Agua'; });
+  numero++;
+  ventas.push({ id: nuevoId_(), numero: numero, fecha: fechaMas_(hoy, -1), hora: '20:15', items: [{ id: pisco.id, nombre: pisco.nombre, precio: pisco.precio, cant: 2 }, { id: agua.id, nombre: agua.nombre, precio: agua.precio, cant: 1 }], total: pisco.precio * 2 + agua.precio, medio: 'cuenta', mesa: '6', atendido_por: 'barra', estado: 'a_cuenta', es_ejemplo: true, socio_id: socios[0].id });
   insertarVarios_('Ventas', ventas);
 
   // Ingresos al club de la semana (de 8:00 a 22:00) e invitados
-  const activos = socios.filter(function (s) { return s.estado === 'activo'; });
   const ingresos = [];
   for (let k = 6; k >= 0; k--) {
     const f = fechaMas_(hoy, -k);
@@ -272,12 +280,13 @@ function cargarEjemplo_() {
         if (azar() < 0.35) ingresos.push({ fecha: f, hora: hhmm_(h), tipo: 'familiar', socio_id: s.id, nombre: fam.nombre, dni: '', tarifa: 0, medio: '', salida: salio ? hhmm_(salida) : '', registrado_por: 'porteria', es_ejemplo: true });
       });
       if (j % 6 === 0) {
-        const piscina = azar() < 0.4;
-        const monto = Number(piscina ? config_().tarifa_invitado_piscina : config_().tarifa_invitado_club);
-        const medio = elegir(['efectivo', 'yape', 'plin']);
+        const r = azar();
+        const entrada = r < 0.25 ? 'comedor' : r < 0.55 ? 'piscina' : 'club';
+        const monto = Number(config_()['tarifa_invitado_' + entrada]) || 0;
+        const medio = monto > 0 ? elegir(['efectivo', 'yape', 'plin']) : '';
         const inv = { id: nuevoId_(), fecha: f, hora: hhmm_(h + 1), tipo: 'invitado', socio_id: s.id, nombre: elegir(NOMBRES_H.concat(NOMBRES_M)) + ' ' + elegir(APELLIDOS) + ' ' + elegir(APELLIDOS), dni: '7' + entre(1000000, 9999999), tarifa: monto, medio: medio, salida: salio ? hhmm_(salida) : '', registrado_por: 'porteria', es_ejemplo: true };
         ingresos.push(inv);
-        caja.push({ fecha: f, hora: inv.hora, tipo: 'ingreso', origen: 'invitados', concepto: 'Invitado (' + (piscina ? 'piscina' : 'club') + ') de ' + s.nombres + ' ' + s.apellidos + ': ' + inv.nombre, monto: monto, medio: medio, referencia: inv.id, registrado_por: 'porteria', es_ejemplo: true });
+        if (monto > 0) caja.push({ fecha: f, hora: inv.hora, tipo: 'ingreso', origen: 'invitados', concepto: 'Invitado (' + entrada + ') de ' + s.nombres + ' ' + s.apellidos + ': ' + inv.nombre, monto: monto, medio: medio, referencia: inv.id, registrado_por: 'porteria', es_ejemplo: true });
       }
     });
   }
@@ -307,12 +316,12 @@ function cargarEjemplo_() {
       reservas.push({ fecha: f, hora: hora, cancha: cancha, socio_id: elegir(activos.slice(2)).id, estado: 'reservada', creado_por: 'admin', es_ejemplo: true });
     }
   }
-  reservas.push({ fecha: fechaMas_(hoy, 2), hora: '07:00', cancha: 'Tenis 1', socio_id: socios[0].id, estado: 'reservada', creado_por: 'socio', es_ejemplo: true });
+  reservas.push({ fecha: fechaMas_(hoy, 2), hora: '07:00', cancha: CANCHAS[0], socio_id: socios[0].id, estado: 'reservada', creado_por: 'socio', es_ejemplo: true });
   insertarVarios_('Reservas', reservas);
 
   // Alquileres de ambientes
   const alquileres = [
-    [fechaMas_(hoy, -9), 'Rincón parrillero', 'Familia Torres Vera (ejemplo)', 'socio', 400, 400, 'realizado', 'Almuerzo familiar'],
+    [fechaMas_(hoy, -9), 'Rincón parrillero', 'Familia Torres Vera (ejemplo)', 'socio', 800, 800, 'realizado', 'Incluye uso de cocina (S/ 400). Almuerzo familiar'],
     [fechaMas_(hoy, -3), 'Salón principal 1/2', 'Cumpleaños de socio (ejemplo)', 'socio', 700, 700, 'realizado', ''],
     [fechaMas_(hoy, 5), 'Salón principal', 'Matrimonio de ejemplo', 'no_socio', 3000, 1500, 'confirmado', 'Decoración el día anterior'],
     [fechaMas_(hoy, 8), 'Rincón parrillero + jardín', 'Empresa de ejemplo S.A.C.', 'institucion', 2000, 0, 'reservado', 'Falta el adelanto'],

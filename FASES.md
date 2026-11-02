@@ -24,7 +24,7 @@ Un solo sistema para todo el club, con un solo ingreso. Hoy funciona en **Google
 - Busca al socio por **DNI, nombre o código del carnet**. Un lector de códigos USB también funciona: escribe el código solo.
 - Muestra si está **al día** o **cuánto debe**. Por regla del club puede entrar igual y se le avisa (se cambia en Ajustes).
 - **Registra el ingreso** del socio y de su **familia** con un toque.
-- **Invitados:** nombre, DNI, si va al club (S/ 10) o a la piscina (S/ 20) y cómo pagó. Respeta los límites: 5 invitados por socio al día y 3 visitas al mes por invitado. El cobro entra solo a la caja.
+- **Invitados:** nombre, DNI, si va al club (S/ 10), a la piscina (S/ 20) o al comedor (sin costo) y cómo pagó. Respeta los límites: 5 invitados por socio al día y 3 visitas al mes por invitado. El cobro entra solo a la caja.
 - Lista de **quién está dentro** y botón de **salida**.
 - **Asistencia del personal:** cada trabajador marca entrada y salida con su PIN de 4 números; el sistema calcula la tardanza.
 
@@ -37,7 +37,8 @@ Un solo sistema para todo el club, con un solo ingreso. Hoy funciona en **Google
 - Padrón con búsqueda y filtros: todos, al día, con deuda y suspendidos.
 - Ficha de cada socio: datos, familia, cuotas del año en colores (pagada, vencida, por pagar), pagos e ingresos al club.
 - **Registrar pago** de una o varias cuotas con efectivo, Yape, Plin, tarjeta o transferencia. Entra solo a la caja.
-- **Generar las cuotas del mes** con un botón (S/ 80, vence el día 10 del mes siguiente).
+- **Generar las cuotas del mes** con un botón (hoy S/ 80, vence el día 10 del mes siguiente; monto y día por confirmar con el club, se cambian en Ajustes).
+- **Consumos a cuenta**: la ficha muestra lo que el socio cargó en la barra y administración lo cobra con **Cobrar consumos** (recibo y entra a la caja).
 - Socio nuevo, editar, suspender o activar, y reiniciar el PIN.
 
 **Falta para después:** cargar el padrón real desde Excel y enviar recordatorios de pago.
@@ -46,7 +47,7 @@ Un solo sistema para todo el club, con un solo ingreso. Hoy funciona en **Google
 
 **Quién la usa:** el bartender, en tablet o celular.
 
-- **Vender** con la carta real (55 productos, precios en soles): toca los productos, elige cómo paga y cobra.
+- **Vender** con la carta real (55 productos, precios en soles): toca los productos, elige cómo paga y cobra. Si el socio paga después, se carga **a su cuenta** (el ticket sale con su nombre y línea de firma).
 - **Ventas de hoy** con el total por Yape, Plin, efectivo y tarjeta. Administración puede **anular** con motivo.
 - **Stock** de botellas, cervezas y gaseosas: avisa cuando queda poco y se registra la mercadería que llega.
 
@@ -72,14 +73,14 @@ Un solo sistema para todo el club, con un solo ingreso. Hoy funciona en **Google
 
 ## Fase 6 · Tenis y alquileres
 
-- **Tenis:** Tenis 1 y Tenis 2, de 6:00 a 22:00, turnos de una hora. El socio reserva desde su celular; portería o administración reservan a nombre de un socio.
-- **Alquileres:** salón principal (completo, 1/2 y 1/3), rincón parrillero, piscina y deck con las **tarifas reales** para socio, no socio e institución. Controla que no se cruce el mismo ambiente el mismo día, el adelanto y el saldo.
+- **Tenis:** una cancha, de 6:00 a 22:00, turnos de una hora. Máximo una reserva por socio al día y 3 por semana (de lunes a domingo). La cancha de básquet es de uso libre. El socio reserva desde su celular; portería o administración reservan a nombre de un socio.
+- **Alquileres:** salón principal (completo, 1/2 y 1/3), rincón parrillero, piscina y deck con las **tarifas reales** para socio, no socio e institución, más el **uso de cocina (S/ 400)** para el rincón parrillero. Controla que no se cruce el mismo ambiente el mismo día, el adelanto y el saldo.
 
 ## Fase 7 · Cuenta del socio
 
 **Quién la usa:** cada socio desde su celular, con su DNI y su PIN.
 
-- Si está al día, sus cuotas y sus pagos.
+- Si está al día, sus cuotas, sus pagos y **sus consumos a cuenta**.
 - **Carnet digital con código QR** para mostrar en portería.
 - Reservar tenis y ver los avisos del club.
 

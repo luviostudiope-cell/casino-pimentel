@@ -131,7 +131,7 @@
       'Escribe el <b>DNI, el nombre o el código del carnet</b> del socio. Un lector de códigos también funciona.',
       'Revisa su estado: <b>verde</b> está al día, <b>amarillo</b> debe cuotas. Puede entrar igual y se le avisa.',
       'Toca <b>Registrar ingreso</b>. Para su familia, toca el nombre de cada familiar.',
-      'Para un <b>invitado</b>: llena su nombre y DNI, cobra la entrada e imprime su ticket. El cobro entra solo a la caja.',
+      'Para un <b>invitado</b>: llena su nombre y DNI y elige a dónde entra: <b>club</b>, <b>piscina</b> o <b>comedor</b> (libre). Cobra e imprime su ticket; el cobro entra solo a la caja.',
       'Cuando alguien se va, toca <b>Salida</b> en la lista de abajo.',
     ]],
     asistencia: ['Cómo marca el personal', [
@@ -149,10 +149,11 @@
       'Arriba ves si está <b>al día</b> o cuánto debe.',
       '<b>Registrar pago</b> cobra una o varias cuotas e imprime el recibo.',
       '<b>Reiniciar PIN</b> sirve si el socio olvidó su clave: vuelve a los últimos 6 números de su DNI.',
+      '<b>Cobrar consumos</b> cobra lo que el socio cargó a su cuenta en la barra.',
     ]],
     barra: ['Cómo funciona la barra', [
       'Toca los <b>productos</b> para armar el pedido. Con + y − cambias la cantidad.',
-      'Elige <b>cómo paga</b> (efectivo, Yape, Plin o tarjeta) y toca <b>Cobrar</b>.',
+      'Elige <b>cómo paga</b>: efectivo, Yape, Plin, tarjeta o <b>a la cuenta</b> del socio (lo buscas y se le cobra después en administración). Toca <b>Cobrar</b>.',
       '<b>Imprime el ticket</b> y entrégalo en la barra para que preparen el pedido. No es boleta ni factura.',
       'En <b>Stock</b> registras la mercadería que llega. El sistema avisa cuando queda poco.',
     ]],
@@ -169,14 +170,15 @@
     ]],
     reservas: ['Cómo funcionan las reservas', [
       'Elige el <b>día</b> arriba.',
-      'Toca un horario <b>Libre</b> de Tenis 1 o Tenis 2. Cada turno dura una hora.',
+      'Toca un horario <b>Libre</b> de la cancha de tenis. Cada turno dura una hora.',
       'Busca al socio y confirma. El socio también puede reservar desde su celular.',
-      'Cada socio puede reservar <b>una vez por día</b>, hasta con <b>7 días</b> de anticipación.',
+      'Cada socio puede reservar <b>una vez por día</b> y hasta <b>3 veces por semana</b>, con 7 días de anticipación. La cancha de básquet es de uso libre.',
     ]],
     alquileres: ['Cómo funcionan los alquileres', [
       'Toca <b>Nuevo alquiler</b>, elige el ambiente y el tipo de cliente: el <b>precio se pone solo</b>.',
       'Si deja <b>adelanto</b>, queda confirmado y el dinero entra a la caja.',
       'Toca un alquiler para <b>cobrar el saldo</b>, marcarlo como realizado o cancelarlo.',
+      'Al rincón parrillero se le puede sumar el <b>uso de cocina</b> (S/ 400).',
       'El sistema no deja alquilar el mismo ambiente dos veces el mismo día.',
     ]],
     avisos: ['Cómo funcionan los avisos', [
@@ -192,6 +194,7 @@
     micuenta: ['Cómo usar tu cuenta', [
       'Arriba ves si estás <b>al día</b> con tus cuotas.',
       'Toca <b>Mi carnet</b> y muéstralo en portería para entrar.',
+      'Si cargaste consumos de la barra a tu cuenta, los ves en <b>Mis consumos</b>.',
       'Reserva la <b>cancha de tenis</b> desde tu celular.',
       'En <b>Avisos del club</b> te enteras de las novedades.',
     ]],
@@ -408,9 +411,9 @@
   function ticketVenta(v, fecha) {
     return {
       titulo: 'Ticket de venta', numero: v.numero, fecha: fecha || v.fecha, hora: v.hora, total: v.total, medio: v.medio,
-      datos: [['Mesa', v.mesa || '—'], ['Atendió', v.atendido || '—']],
+      datos: [['Mesa', v.mesa || '—'], ['Atendió', v.atendido || '—']].concat(v.socio ? [['A la cuenta de', v.socio + ' (' + v.codigo + ')']] : []),
       lineas: (v.items || []).map(function (i) { return [i.cant + ' x ' + i.nombre, soles(i.precio * i.cant)]; }),
-      pie: ['Entregar este ticket en la barra', 'No es boleta ni factura', 'Gracias por su visita'],
+      pie: (v.socio ? ['Cargado a la cuenta del socio', 'Firma: ______________________'] : []).concat(['Entregar este ticket en la barra', 'No es boleta ni factura', 'Gracias por su visita']),
     };
   }
   function ticketPago(r) {
@@ -425,9 +428,18 @@
   function ticketInvitado(r) {
     return {
       titulo: 'Ticket de invitado', fecha: r.fecha, hora: r.hora, total: r.monto, medio: r.medio,
-      datos: [['Invitado', r.nombre], ['DNI', r.dni], ['Invitado por', r.anfitrion + ' (' + r.codigo + ')'], ['Entrada', r.entrada === 'piscina' ? 'Piscina' : 'Club']],
-      lineas: [['Entrada de invitado', soles(r.monto)]],
+      datos: [['Invitado', r.nombre], ['DNI', r.dni], ['Invitado por', r.anfitrion + ' (' + r.codigo + ')'], ['Entrada', ENTRADAS[r.entrada] || 'Club']],
+      lineas: [['Entrada de invitado', r.monto ? soles(r.monto) : 'Libre']],
       pie: ['Válido solo por hoy', 'No es boleta ni factura'],
+    };
+  }
+  var ENTRADAS = { club: 'Club', piscina: 'Piscina', comedor: 'Comedor' };
+  function ticketConsumos(r) {
+    return {
+      titulo: 'Recibo de consumos', fecha: r.fecha, hora: r.hora, total: r.total, medio: r.medio,
+      datos: [['Socio', r.socio], ['Código', r.codigo], ['Atendió', r.atendido]],
+      lineas: r.lineas.map(function (l) { return ['Venta N° ' + l.numero + ' · ' + fechaCorta(l.fecha), soles(l.total)]; }),
+      pie: ['Consumos de la barra cargados a la cuenta', 'No es boleta ni factura'],
     };
   }
 
@@ -739,6 +751,7 @@
       d.alquileres.filter(function (a) { return a.estado === 'reservado'; }).forEach(function (a) {
         alertas += filaAlerta('alquileres', 'azul', a.ambiente + ': falta el adelanto', diaRelativo(a.fecha, d.hoy) + ' · ' + a.cliente, 'alquileres');
       });
+      if (d.consumosACuenta && d.consumosACuenta.total > 0) alertas += filaAlerta('barra', 'sol', soles(d.consumosACuenta.total) + ' en consumos a cuenta por cobrar', plural(d.consumosACuenta.socios, 'socio cargó', 'socios cargaron') + ' consumos de la barra a su cuenta', 'socios');
       alertas += filaAlerta('dinero', 'ok', 'Este mes se cobraron ' + soles(d.cobradoMes) + ' en cuotas', 'Toca para ver el estado de los socios', 'socios');
       var max = Math.max.apply(null, d.dias.map(function (x) { return x.ventas; }).concat([1]));
       var barras = d.dias.map(function (x) {
@@ -891,9 +904,19 @@
       '<form class="formulario" data-f="invitado"><input type="hidden" name="socio_id" value="' + s.id + '">' +
       campo('Nombre y apellido del invitado', entrada('nombre', '', 'autocomplete="off" data-foco')) +
       campo('DNI del invitado', entrada('dni', '', 'inputmode="numeric" maxlength="8" placeholder="8 números"')) +
-      grupo('Entra a', opciones('tarifa', [['club', 'Club · ' + solesCorto(t.club)], ['piscina', 'Piscina · ' + solesCorto(t.piscina)]], 'club')) +
-      grupo('Cómo paga', opciones('medio', MEDIOS.slice(0, 3), 'efectivo')) +
-      '<div class="modal-pie"><button type="button" class="btn" data-a="cerrarModal">Cancelar</button><button type="submit" class="btn btn-primario">' + ic('check') + 'Registrar y cobrar</button></div></form>');
+      grupo('Entra a', opciones('tarifa', [['club', 'Club · ' + solesCorto(t.club)], ['piscina', 'Piscina · ' + solesCorto(t.piscina)], ['comedor', 'Comedor · ' + (t.comedor ? solesCorto(t.comedor) : 'libre')]], 'club')) +
+      '<div id="grupoMedioInv">' + grupo('Cómo paga', opciones('medio', MEDIOS.slice(0, 3), 'efectivo')) + '</div>' +
+      '<div class="modal-pie"><button type="button" class="btn" data-a="cerrarModal">Cancelar</button><button type="submit" class="btn btn-primario" id="btnInvitado">' + ic('check') + 'Registrar y cobrar</button></div></form>',
+      function (m) {
+        var revisar = function () {
+          var tarifa = (m.querySelector('input[name=tarifa]:checked') || {}).value;
+          var gratis = !t[tarifa];
+          $('#grupoMedioInv', m).hidden = gratis;
+          $('#btnInvitado', m).innerHTML = ic('check') + (gratis ? 'Registrar invitado' : 'Registrar y cobrar');
+        };
+        m.addEventListener('change', function (e) { if (e.target.name === 'tarifa') revisar(); });
+        revisar();
+      });
   };
   FORM.invitado = function (f, d, btn) {
     ocupado(btn, true);
@@ -901,8 +924,9 @@
       $('#resultados').innerHTML = '';
       var b = $('#buscarSocio'); if (b) b.value = '';
       refrescarIngresos();
-      avisar('Invitado registrado: ' + r.nombre + (r.monto ? ' · cobrar ' + soles(r.monto) : ''));
-      modalTicket('Invitado registrado', r.nombre + (r.monto ? ' · cobrar ' + soles(r.monto) : ''), ticketInvitado(r));
+      var detalle = r.monto ? ' · cobrar ' + soles(r.monto) : ' · ' + (ENTRADAS[r.entrada] || '').toLowerCase() + ', sin costo';
+      avisar('Invitado registrado: ' + r.nombre + detalle);
+      modalTicket('Invitado registrado', r.nombre + detalle, ticketInvitado(r));
     }).catch(function (e) { ocupado(btn, false); fallo(e); });
   };
 
@@ -1048,9 +1072,29 @@
         '<section class="tarjeta"><h2>Datos</h2><dl class="datos"><dt>DNI</dt><dd class="num">' + esc(s.dni) + '</dd><dt>Celular</dt><dd class="num">' + esc(s.celular || '—') + '</dd><dt>Correo</dt><dd>' + esc(s.correo || '—') + '</dd>' +
         '<dt>Nacimiento</dt><dd>' + (s.fecha_nacimiento ? esc(fechaCorta(s.fecha_nacimiento) + ' ' + s.fecha_nacimiento.slice(0, 4)) : '—') + '</dd></dl>' +
         '<h2 class="mt-l">Familia</h2><div class="lista">' + fam + '</div></section></div>' +
+        (s.consumos.length ? '<section class="tarjeta mt"><div class="tarjeta-cab"><div><h2>Consumos de la barra a su cuenta</h2><p>Por cobrar: <b>' + soles(s.consumosTotal) + '</b></p></div>' +
+          (admin ? '<button class="btn btn-primario" data-a="cobrarConsumos">' + ic('dinero') + 'Cobrar consumos</button>' : '') + '</div><div class="lista">' + s.consumos.map(function (v) {
+            return '<div class="fila"><span class="icono-circulo sol">' + ic('barra') + '</span><div class="principal"><div class="nombre">Venta N° ' + v.numero + ' · ' + fechaMedia(v.fecha) + ' ' + esc(v.hora) + '</div><div class="meta">' + esc(v.resumen) + '</div></div><span class="monto">' + soles(v.total) + '</span></div>';
+          }).join('') + '</div></section>' : '') +
         '<div class="rejilla-2"><section class="tarjeta"><h2>Pagos</h2><div class="lista mt">' + pagos + '</div></section>' +
         '<section class="tarjeta"><h2>Últimos ingresos al club</h2><div class="lista mt">' + ings + '</div></section></div>';
     });
+  };
+  ACC.cobrarConsumos = function () {
+    var s = E.datos.socio;
+    abrirModal(modalCab('Cobrar consumos a cuenta', s.nombre) + '<form class="formulario" data-f="consumos"><input type="hidden" name="socio_id" value="' + s.id + '">' +
+      '<div class="lista">' + s.consumos.map(function (v) { return '<div class="fila"><div class="principal"><div class="nombre">Venta N° ' + v.numero + ' · ' + fechaMedia(v.fecha) + '</div><div class="meta">' + esc(v.resumen) + '</div></div><span class="monto">' + soles(v.total) + '</span></div>'; }).join('') + '</div>' +
+      '<div class="total"><span>Total a cobrar</span><b>' + soles(s.consumosTotal) + '</b></div>' +
+      grupo('Cómo pagó', opciones('medio', MEDIOS, 'efectivo')) +
+      '<div class="modal-pie"><button type="button" class="btn" data-a="cerrarModal">Cancelar</button><button type="submit" class="btn btn-primario">' + ic('check') + 'Registrar cobro</button></div></form>');
+  };
+  FORM.consumos = function (f, d, btn) {
+    ocupado(btn, true);
+    llamar('cobrarConsumos', d).then(function (r) {
+      avisar('Consumos cobrados: ' + soles(r.total));
+      pintarVista();
+      modalTicket('Consumos cobrados', r.socio + ' · ' + soles(r.total), ticketConsumos(r));
+    }).catch(function (e) { ocupado(btn, false); fallo(e); });
   };
   ACC.editarSocio = function () { abrirModal(modalCab('Editar socio', E.datos.socio.nombre) + formSocio(E.datos.socio)); };
   ACC.pinSocio = function () {
@@ -1119,7 +1163,7 @@
           '<section class="tarjeta mt"><div class="tarjeta-cab"><div><h2>Ventas del día</h2><p>Toca la impresora para volver a imprimir un ticket</p></div></div><div class="lista">' + (d.ventas.length ? d.ventas.map(function (v) {
             var resumen = v.items.map(function (i) { return i.cant + '× ' + i.nombre; }).join(', ');
             return '<div class="fila"><span class="hora">' + esc(v.hora) + '</span><div class="principal"><div class="nombre">N° ' + v.numero + (v.mesa ? ' · mesa ' + esc(v.mesa) : '') + '</div><div class="meta">' + esc(resumen) + '</div></div>' +
-              '<span class="etiqueta ocultar-movil">' + esc(v.medio) + '</span>' +
+              (v.estado === 'a_cuenta' ? '<span class="etiqueta sol ocultar-movil">Por cobrar · ' + esc(v.socio) + '</span>' : '<span class="etiqueta ocultar-movil">' + esc(v.medio) + '</span>') +
               (v.estado === 'anulada' ? '<span class="etiqueta peligro">Anulada</span>' : '<span class="monto">' + soles(v.total) + '</span>') +
               (v.estado !== 'anulada' ? '<button class="btn btn-sm btn-icono btn-plano" data-a="reimprimir" data-id="' + v.id + '" aria-label="Imprimir ticket ' + v.numero + '" title="Imprimir ticket">' + ic('imprimir') + '</button>' : '') +
               (d.puedeAnular && v.estado !== 'anulada' ? '<button class="btn btn-sm btn-icono btn-plano" data-a="anularVenta" data-id="' + v.id + '" aria-label="Anular venta ' + v.numero + '" title="Anular">' + ic('anular') + '</button>' : '') + '</div>';
@@ -1173,10 +1217,13 @@
       }).join('') + '</div>' : '<div class="vacio" style="padding:22px 8px">' + ic('barra') + '<p>Toca un producto para agregarlo.</p></div>') +
       '<div class="total"><span>Total</span><b>' + soles(total) + '</b></div>' +
       '<div class="pila" style="gap:14px">' + campo('Mesa (opcional)', '<input class="entrada" id="mesaBarra" inputmode="numeric" maxlength="6" value="' + esc(E.mesaBarra || '') + '" data-in="mesaBarra">') +
-      grupo('Cómo paga', '<div class="opciones">' + MEDIOS.slice(0, 4).map(function (m) {
+      grupo('Cómo paga', '<div class="opciones">' + MEDIOS.slice(0, 4).concat([['cuenta', 'A la cuenta']]).map(function (m) {
         return '<label class="opcion"><input type="radio" name="medioBarra" value="' + m[0] + '"' + (m[0] === medio ? ' checked' : '') + ' data-in="medioBarra"><span>' + m[1] + '</span></label>';
       }).join('') + '</div>') +
-      '<button class="btn btn-primario btn-lg btn-bloque" data-a="cobrar"' + (l.length ? '' : ' disabled') + '>' + ic('check') + 'Cobrar ' + soles(total) + '</button></div>';
+      (medio === 'cuenta' ? grupo('Socio que carga el consumo a su cuenta', E.socioCuenta
+        ? '<div class="fila" style="border:1.5px solid var(--celeste-medio);border-radius:20px;padding:10px 12px;background:var(--celeste-claro)"><span class="avatar">' + esc(iniciales(E.socioCuenta.nombre)) + '</span><div class="principal"><div class="nombre">' + esc(E.socioCuenta.nombre) + '</div><div class="meta">Socio ' + esc(E.socioCuenta.codigo) + '</div></div><button class="btn btn-sm btn-plano" data-a="quitarSocioCuenta">Cambiar</button></div>'
+        : '<div class="buscador">' + ic('buscar') + '<input class="entrada" id="buscarCuenta" type="search" placeholder="DNI o nombre del socio" autocomplete="off" data-in="buscarCuenta"></div><div id="resCuenta" class="lista"></div>') : '') +
+      '<button class="btn btn-primario btn-lg btn-bloque" data-a="cobrar"' + (l.length && (medio !== 'cuenta' || E.socioCuenta) ? '' : ' disabled') + '>' + ic('check') + (medio === 'cuenta' ? 'Cargar ' + soles(total) + ' a la cuenta' : 'Cobrar ' + soles(total)) + '</button></div>';
     var pm = $('#pedidoMovil');
     if (pm) {
       pm.hidden = !l.length;
@@ -1184,7 +1231,31 @@
     }
   }
   ENTRADA.mesaBarra = function (el) { E.mesaBarra = el.value; };
-  ENTRADA.medioBarra = function (el) { E.medioBarra = el.value; };
+  ENTRADA.medioBarra = function (el) {
+    var antes = E.medioBarra || 'efectivo';
+    E.medioBarra = el.value;
+    if ((antes === 'cuenta') !== (el.value === 'cuenta')) {
+      pintarTicket();
+      var b = $('#buscarCuenta'); if (b && window.matchMedia('(pointer: fine)').matches) b.focus();
+    }
+  };
+  var cuentaTiempo;
+  ENTRADA.buscarCuenta = function (el) {
+    clearTimeout(cuentaTiempo);
+    var q = el.value.trim(), r = $('#resCuenta');
+    if (q.length < 2) { r.innerHTML = ''; return; }
+    cuentaTiempo = setTimeout(function () {
+      llamar('buscarSocios', { q: q }).then(function (lista) {
+        if (el.value.trim() !== q) return;
+        r.innerHTML = lista.length ? lista.slice(0, 5).map(function (s) {
+          var activo = s.estado === 'activo';
+          return '<div class="fila' + (activo ? ' boton' : '') + '"' + (activo ? ' data-a="elegirSocioCuenta" data-id="' + s.id + '" data-nombre="' + esc(s.nombre) + '" data-codigo="' + esc(s.codigo) + '"' : '') + '><span class="avatar">' + esc(iniciales(s.nombres + ' ' + s.apellidos)) + '</span><div class="principal"><div class="nombre">' + esc(s.nombre) + '</div><div class="meta">Socio ' + esc(s.codigo) + ' · DNI ' + esc(s.dni) + '</div></div>' + (activo ? '' : '<span class="etiqueta peligro">Suspendido</span>') + '</div>';
+        }).join('') : vacio('buscar', 'No encontramos a ese socio.');
+      }).catch(fallo);
+    }, 280);
+  };
+  ACC.elegirSocioCuenta = function (el) { E.socioCuenta = { id: el.dataset.id, nombre: el.dataset.nombre, codigo: el.dataset.codigo }; pintarTicket(); };
+  ACC.quitarSocioCuenta = function () { E.socioCuenta = null; pintarTicket(); var b = $('#buscarCuenta'); if (b) b.focus(); };
   ACC.verPedido = function () { $('#ticket').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   ACC.agregar = function (el) {
     var id = el.dataset.id;
@@ -1204,17 +1275,23 @@
   ACC.cobrar = function (el) {
     var items = lineasPedido().map(function (x) { return { id: x.p.id, cant: x.cant }; });
     var medio = (document.querySelector('input[name=medioBarra]:checked') || {}).value || 'efectivo';
+    if (medio === 'cuenta' && !E.socioCuenta) { avisar('Busca y elige al socio que carga el consumo a su cuenta.', 'alerta'); return; }
     ocupado(el, true);
-    llamar('registrarVenta', { items: items, medio: medio, mesa: ($('#mesaBarra') || {}).value || '' }).then(function (r) {
-      E.pedido = {}; E.mesaBarra = '';
-      avisar('Venta N° ' + r.numero + ' cobrada: ' + soles(r.total));
-      modalTicket('Venta cobrada', 'N° ' + r.numero + ' · ' + soles(r.total) + ' · ' + r.medio, ticketVenta(r), 'Nueva venta');
+    llamar('registrarVenta', { items: items, medio: medio, mesa: ($('#mesaBarra') || {}).value || '', socio_id: medio === 'cuenta' ? E.socioCuenta.id : '' }).then(function (r) {
+      E.pedido = {}; E.mesaBarra = ''; E.socioCuenta = null; E.medioBarra = 'efectivo';
+      if (r.socio) {
+        avisar('Venta N° ' + r.numero + ' cargada a la cuenta de ' + r.socio + ': ' + soles(r.total));
+        modalTicket('Cargado a la cuenta', 'N° ' + r.numero + ' · ' + soles(r.total) + ' · ' + r.socio, ticketVenta(r), 'Nueva venta');
+      } else {
+        avisar('Venta N° ' + r.numero + ' cobrada: ' + soles(r.total));
+        modalTicket('Venta cobrada', 'N° ' + r.numero + ' · ' + soles(r.total) + ' · ' + r.medio, ticketVenta(r), 'Nueva venta');
+      }
       return llamar('barraHoy').then(function (d) { E.datos.barra = d; if ($('#productos')) { pintarProductos(); pintarTicket(); } });
     }).catch(function (e) { ocupado(el, false); fallo(e); });
   };
   ACC.reimprimir = function (el) {
     var d = E.datos.barra, v = d.ventas.find(function (x) { return x.id === el.dataset.id; });
-    E.ticket = ticketVenta({ numero: v.numero, hora: v.hora, items: v.items, total: v.total, medio: v.medio, mesa: v.mesa, atendido: v.atendido }, d.hoy);
+    E.ticket = ticketVenta({ numero: v.numero, hora: v.hora, items: v.items, total: v.total, medio: v.medio, mesa: v.mesa, atendido: v.atendido, socio: v.socio, codigo: v.codigo }, d.hoy);
     ACC.imprimirTicket();
   };
   ACC.anularVenta = function (el) {
@@ -1374,7 +1451,7 @@
       var dias = '<div class="chips desliza mb">' + d.dias.map(function (f) {
         return '<button class="chip ' + (f === d.fecha ? 'activo' : '') + '" data-a="diaTenis" data-v="' + f + '">' + esc(diaRelativo(f, d.hoy)) + '</button>';
       }).join('') + '</div>';
-      var grilla = '<div class="grilla-tenis"><span></span>' + d.canchas.map(function (k) { return '<div class="cab">' + esc(k) + '</div>'; }).join('');
+      var grilla = '<div class="grilla-tenis" style="grid-template-columns:74px repeat(' + d.canchas.length + ',minmax(0,1fr))"><span></span>' + d.canchas.map(function (k) { return '<div class="cab">' + esc(nombreCancha(k)) + '</div>'; }).join('');
       var horas = d.fecha === d.hoy ? d.horas.filter(function (h) { return h > d.ahora; }) : d.horas;
       if (!horas.length) grilla += '<div style="grid-column:1/-1">' + vacio('reservas', 'Por hoy ya no quedan horarios. Elige otro día.') + '</div>';
       horas.forEach(function (h) {
@@ -1391,19 +1468,21 @@
       });
       grilla += '</div>';
       c.innerHTML = hero({ etiqueta: 'Tenis', icono: 'reservas', titulo: esSocio ? 'Reserva tu cancha' : 'Reservas de tenis', sub: esSocio ? 'Elige el día y toca un horario libre. Cada turno dura una hora.' : 'Elige el día y toca un horario libre para reservar a nombre de un socio.', ayuda: 'reservas' }) + dias +
+        (esSocio && d.quedanSemana !== null ? '<div class="nota azul mb">' + ic('info') + '<span>' + (d.quedanSemana > 0 ? 'Esa semana te ' + (d.quedanSemana === 1 ? 'queda 1 reserva' : 'quedan ' + d.quedanSemana + ' reservas') : 'Ya usaste tus ' + d.maxSemana + ' reservas de esa semana') + ' (máximo ' + d.maxSemana + ' por semana, de lunes a domingo).</span></div>' : '') +
         '<section class="tarjeta">' + grilla + '</section>' +
-        '<p class="centro mt" style="color:var(--tinta-2)">' + (esSocio ? 'Puedes reservar una vez por día, hasta con una semana de anticipación.' : 'Un socio puede reservar una vez por día, hasta con 7 días de anticipación.') + '</p>';
+        '<p class="centro mt" style="color:var(--tinta-2)">' + (esSocio ? 'Puedes reservar una vez por día y hasta ' + d.maxSemana + ' veces por semana, con una semana de anticipación.' : 'Un socio puede reservar una vez por día y hasta ' + d.maxSemana + ' veces por semana, con 7 días de anticipación. La cancha de básquet es de uso libre.') + '</p>';
     });
   };
+  function nombreCancha(k) { return k === 'Tenis' ? 'Cancha de tenis' : k; }
   ACC.diaTenis = function (el) {
     document.querySelectorAll('[data-a=diaTenis]').forEach(function (b) { b.classList.toggle('activo', b === el); });
     setTimeout(function () { ir('reservas', { fecha: el.dataset.v }); }, 120);
   };
   ACC.nuevaReserva = function (el) {
     var d = E.datos.reservas, h = el.dataset.h, k = el.dataset.k;
-    var titulo = k + ' · ' + diaRelativo(d.fecha, d.hoy) + ' a las ' + h;
+    var titulo = nombreCancha(k) + ' · ' + diaRelativo(d.fecha, d.hoy) + ' a las ' + h;
     if (E.perfil.rol === 'socio') {
-      confirmar('Reservar ' + k, diaRelativo(d.fecha, d.hoy) + ' (' + fechaLarga(d.fecha) + ') de ' + h + ' a ' + (Number(h.slice(0, 2)) + 1) + ':00.', 'Reservar').then(function () {
+      confirmar('Reservar la ' + nombreCancha(k).toLowerCase(), diaRelativo(d.fecha, d.hoy) + ' (' + fechaLarga(d.fecha) + ') de ' + h + ' a ' + (Number(h.slice(0, 2)) + 1) + ':00.', 'Reservar').then(function () {
         llamar('reservar', { fecha: d.fecha, hora: h, cancha: k }).then(function () { avisar('Listo, tu cancha está reservada.'); pintarVista(); }).catch(fallo);
       });
       return;
@@ -1433,7 +1512,7 @@
   };
   ACC.verReserva = function (el) {
     var d = E.datos.reservas, r = d.reservas.find(function (x) { return x.id === el.dataset.id; });
-    abrirModal(modalCab(r.cancha + ' · ' + r.hora, diaRelativo(d.fecha, d.hoy) + ', ' + fechaLarga(d.fecha)) +
+    abrirModal(modalCab(nombreCancha(r.cancha) + ' · ' + r.hora, diaRelativo(d.fecha, d.hoy) + ', ' + fechaLarga(d.fecha)) +
       '<p style="font-size:16px">' + esc(E.perfil.rol === 'socio' ? 'Esta es tu reserva.' : 'Reservado por ' + r.socio + '.') + '</p>' +
       '<div class="modal-pie mt-l"><button class="btn" data-a="cerrarModal">Volver</button><button class="btn btn-peligro" data-a="cancelarReserva" data-id="' + r.id + '">Cancelar reserva</button></div>');
   };
@@ -1460,7 +1539,7 @@
       var tarifas = d.ambientes.map(function (a) {
         var t = a.tarifas, txt = [t.socio ? 'Socio ' + solesCorto(t.socio) : '', t.no_socio ? 'No socio ' + solesCorto(t.no_socio) : '', t.institucion ? 'Institución ' + solesCorto(t.institucion) : ''].filter(Boolean).join(' · ');
         return '<div class="fila"><span class="icono-circulo azul">' + ic('alquileres') + '</span><div class="principal"><div class="nombre">' + esc(a.nombre) + '</div><div class="meta" style="white-space:normal">' + esc(txt || a.nota || 'Por confirmar') + (a.garantia ? ' · garantía ' + solesCorto(a.garantia) : '') + '</div></div></div>';
-      }).join('');
+      }).join('') + '<div class="fila"><span class="icono-circulo sol">' + ic('mas') + '</span><div class="principal"><div class="nombre">Adicional: ' + esc(d.cocina.nombre.toLowerCase()) + '</div><div class="meta" style="white-space:normal">' + solesCorto(d.cocina.precio) + ' para socio, no socio e institución</div></div></div>';
       c.innerHTML = hero({ etiqueta: 'Alquileres', icono: 'alquileres', titulo: 'Alquiler de ambientes', sub: 'Salón principal, rincón parrillero, piscina y deck. ' + plural(prox.length, 'evento próximo', 'eventos próximos') + '.', acciones: admin ? '<button class="btn btn-primario" data-a="nuevoAlquiler">' + ic('mas') + 'Nuevo alquiler</button>' : '', ayuda: 'alquileres' }) +
         '<div class="rejilla-2 ancha" style="margin-top:0"><section class="tarjeta"><div class="tarjeta-cab"><div><h2>Próximos eventos</h2><p>Toca uno para cobrar el saldo o cambiar su estado</p></div></div><div class="lista">' + (prox.map(fila).join('') || vacio('alquileres', 'No hay alquileres próximos.')) + '</div>' +
         (pas.length ? '<h2 class="mt-l">Eventos pasados</h2><div class="lista mt">' + pas.slice(0, 10).map(fila).join('') + '</div>' : '') + '</section>' +
@@ -1472,6 +1551,7 @@
     abrirModal(modalCab('Nuevo alquiler', 'El precio se pone solo según el ambiente y el tipo de cliente.') + '<form class="formulario" data-f="alquiler">' +
       grupo('Ambiente', opciones('ambiente', d.ambientes.map(function (a) { return [a.nombre, a.nombre]; }), d.ambientes[0].nombre)) +
       grupo('Cliente', opciones('tipo', [['socio', 'Socio'], ['no_socio', 'No socio'], ['institucion', 'Institución']], 'socio')) +
+      '<div id="grupoCocina">' + grupo('Uso de cocina', opciones('cocina', [['no', 'Sin cocina'], ['si', 'Con cocina · + ' + solesCorto(d.cocina.precio)]], 'no')) + '</div>' +
       campoFecha('Fecha del evento', 'fecha', sumarDias(d.hoy, 7), { min: d.hoy, modo: 'evento' }) +
       '<div class="dos">' + campo('Nombre del cliente', entrada('cliente', '', 'autocomplete="off"')) + campo('Celular', entrada('celular', '', 'inputmode="tel" maxlength="9"')) + '</div>' +
       '<div class="dos">' + campo('Precio (S/)', entrada('monto', '', 'type="number" min="0" step="10" inputmode="decimal" id="montoAlq"')) + campo('Adelanto (S/)', entrada('adelanto', '0', 'type="number" min="0" step="10" inputmode="decimal"')) + '</div>' +
@@ -1483,11 +1563,15 @@
           var nombre = (m.querySelector('input[name=ambiente]:checked') || {}).value;
           var a = d.ambientes.find(function (x) { return x.nombre === nombre; });
           var tipo = (m.querySelector('input[name=tipo]:checked') || {}).value;
+          var conCocina = a && a.grupo === d.cocina.grupo;
+          $('#grupoCocina', m).hidden = !conCocina;
+          if (!conCocina) { var no = m.querySelector('input[name=cocina][value=no]'); if (no) no.checked = true; }
+          var cocina = conCocina && (m.querySelector('input[name=cocina]:checked') || {}).value === 'si';
           var precio = a && a.tarifas[tipo];
-          $('#montoAlq', m).value = precio || '';
+          $('#montoAlq', m).value = precio ? precio + (cocina ? d.cocina.precio : 0) : '';
           $('#montoAlq', m).placeholder = precio ? '' : 'Tarifa por confirmar';
         };
-        m.addEventListener('change', function (e) { if (e.target.name === 'ambiente' || e.target.name === 'tipo') pon(); });
+        m.addEventListener('change', function (e) { if (e.target.name === 'ambiente' || e.target.name === 'tipo' || e.target.name === 'cocina') pon(); });
         pon();
       });
   };
@@ -1608,7 +1692,7 @@
         return '<div class="mes ' + q.estado + '"><b>' + esc(q.mes.split(' ')[0]) + '</b>' + (q.estado === 'pagada' ? 'Pagada' : q.estado === 'vencida' ? 'Vencida' : 'Por pagar') + '</div>';
       }).join('');
       var reservas = s.reservas.length ? s.reservas.map(function (r) {
-        return '<div class="fila"><span class="icono-circulo azul">' + ic('reservas') + '</span><div class="principal"><div class="nombre">' + esc(r.cancha) + ' · ' + esc(r.hora) + '</div><div class="meta">' + esc(diaRelativo(r.fecha, s.hoy)) + ', ' + fechaLarga(r.fecha) + '</div></div></div>';
+        return '<div class="fila"><span class="icono-circulo azul">' + ic('reservas') + '</span><div class="principal"><div class="nombre">' + esc(nombreCancha(r.cancha)) + ' · ' + esc(r.hora) + '</div><div class="meta">' + esc(diaRelativo(r.fecha, s.hoy)) + ', ' + fechaLarga(r.fecha) + '</div></div></div>';
       }).join('') : '<div class="vacio" style="padding:20px 8px">' + ic('reservas') + '<p>No tienes reservas próximas.</p><button class="btn btn-sm mt" data-a="ir" data-v="reservas">Reservar tenis</button></div>';
       var avisos = s.avisos.length ? s.avisos.map(function (a) {
         return '<div class="aviso-tarjeta"><b>' + esc(a.titulo) + '</b><p>' + esc(a.texto) + '</p><small>' + mayuscula(fechaMedia(a.fecha)) + '</small></div>';
@@ -1631,6 +1715,9 @@
           : '<div class="grande-num" style="color:var(--peligro)">' + soles(cu.deudaVencida) + '</div><p class="sub">Acércate a administración para ponerte al día.</p>') +
         '<div class="meses">' + meses + '</div></section>' +
         '<section class="tarjeta" id="misAvisos"><h2>Avisos del club</h2><div class="pila mt">' + avisos + '</div></section></div>' +
+        (s.consumos.length ? '<section class="tarjeta mt"><div class="tarjeta-cab"><div><h2>Mis consumos a cuenta</h2><p>Por pagar en administración: <b>' + soles(s.consumosTotal) + '</b></p></div></div><div class="lista">' + s.consumos.map(function (v) {
+          return '<div class="fila"><span class="icono-circulo sol">' + ic('barra') + '</span><div class="principal"><div class="nombre">' + mayuscula(fechaMedia(v.fecha)) + ' · ' + esc(v.hora) + '</div><div class="meta" style="white-space:normal">' + esc(v.resumen) + '</div></div><span class="monto">' + soles(v.total) + '</span></div>';
+        }).join('') + '</div></section>' : '') +
         '<div class="rejilla-2"><section class="tarjeta"><h2>Mis reservas de tenis</h2><div class="lista mt">' + reservas + '</div></section>' +
         '<section class="tarjeta"><h2>Mi familia</h2><p class="sub">Pueden entrar con tu carnet</p><div class="lista mt">' + familia + '</div><h2 class="mt-l">Mis últimos pagos</h2><div class="lista mt">' + pagos + '</div></section></div>';
     });

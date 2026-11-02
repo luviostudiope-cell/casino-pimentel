@@ -58,11 +58,12 @@ async function componer(html, nombre, fondo = false) {
 
 const enLaptop = [['03-inicio', 'inicio'], ['05-inicio-como-funciona', 'como-funciona'], ['07-porteria-busqueda', 'porteria'], ['13-socio-ficha', 'socio-ficha'],
   ['15-socio-recibo', 'recibo-cuotas'], ['18-barra-pedido', 'barra-pedido'], ['19-barra-ticket', 'barra-ticket'], ['22-caja', 'caja'], ['25-personal-hoy', 'personal'],
-  ['28-tenis', 'tenis'], ['29-alquileres', 'alquileres'], ['31-avisos', 'avisos'], ['16-nuevo-socio-calendario', 'calendario'], ['02-ingreso-personal', 'ingreso']]
+  ['28-tenis', 'tenis'], ['29-alquileres', 'alquileres'], ['31-avisos', 'avisos'], ['16-nuevo-socio-calendario', 'calendario'], ['02-ingreso-personal', 'ingreso'],
+  ['33-barra-a-la-cuenta', 'barra-a-la-cuenta'], ['35-socio-consumos-a-cuenta', 'consumos-a-cuenta'], ['37-alquiler-con-cocina', 'alquiler-cocina']]
 for (const [archivo, nombre] of enLaptop) await componer(`<div class="lienzo">${laptop(img(`computadora/${archivo}.png`))}</div>`, `laptop-${nombre}`)
 
 const enCelular = [['01-ingreso', 'ingreso'], ['02-pin', 'pin'], ['03-socio-mi-cuenta', 'socio-mi-cuenta'], ['04-socio-mis-cuotas', 'socio-cuotas'], ['05-socio-carnet', 'socio-carnet'],
-  ['06-socio-tenis', 'socio-tenis'], ['07-socio-crear-pin', 'socio-crear-pin'], ['08-admin-inicio', 'admin-inicio'], ['09-admin-barra', 'admin-barra'], ['10-porteria-busqueda', 'porteria']]
+  ['06-socio-tenis', 'socio-tenis'], ['07-socio-crear-pin', 'socio-crear-pin'], ['08-admin-inicio', 'admin-inicio'], ['09-admin-barra', 'admin-barra'], ['10-porteria-busqueda', 'porteria'], ['11-socio-consumos', 'socio-consumos']]
 for (const [archivo, nombre] of enCelular) await componer(`<div class="lienzo">${celular(img(`celular/${archivo}.png`))}</div>`, `celular-${nombre}`)
 
 const enTablet = [['01-porteria-busqueda', 'porteria'], ['02-porteria-asistencia', 'asistencia'], ['03-barra-vender', 'barra']]
