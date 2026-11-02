@@ -4,6 +4,7 @@ Estos accesos son **de prueba** para la presentación. Antes de usar el sistema 
 
 ## Dónde entrar
 
+- **Dirección corta (Vercel):** https://casino-pimentel.vercel.app
 - **Publicado en Google (cualquier celular o computadora):** https://script.google.com/macros/s/AKfycbyIuh872nN7qy3mP9R3z6mOwbKDSsZkpSzU7OVp17ypTo8J34uEkT1TSh-MBw_ixb9L/exec
 - **Base de datos en Google Sheets** (solo la cuenta luviostudiope@gmail.com puede abrirla): https://docs.google.com/spreadsheets/d/1hizj9E09oSSyE2rbbi73CTuqgVQS0MnccTi7jeCtpy0/edit
 - **En esta PC:** http://localhost:3000
