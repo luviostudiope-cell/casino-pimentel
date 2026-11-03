@@ -35,6 +35,7 @@ const ACCIONES = {
   ingresarStock: { roles: ['barra', 'admin'], escribe: true },
   guardarProducto: { roles: ['admin'], escribe: true },
   cajaDia: { roles: R_DIRECCION },
+  historial: { roles: R_DIRECCION },
   registrarMovimiento: { roles: ['admin'], escribe: true },
   cerrarCaja: { roles: ['admin'], escribe: true },
   personalResumen: { roles: R_DIRECCION },
@@ -733,6 +734,45 @@ function resumenCaja_(fecha) {
   const egresos = movs.filter(function (m) { return m.tipo === 'egreso'; });
   const efectivo = sumar_(ingresos.filter(function (m) { return m.medio === 'efectivo'; }), 'monto') - sumar_(egresos.filter(function (m) { return m.medio === 'efectivo'; }), 'monto');
   return { movs: movs, ingresos: redondear_(sumar_(ingresos, 'monto')), egresos: redondear_(sumar_(egresos, 'monto')), efectivo: redondear_(efectivo) };
+}
+
+/** Todo lo que pasó en el sistema un día: acciones de la bitácora, ventas, portería y marcaciones del personal. Solo lectura. */
+function historial_(d) {
+  const fecha = /^\d{4}-\d{2}-\d{2}$/.test(String(d.fecha || '')) ? d.fecha : hoy_();
+  const socios = mapaPorId_(leer_('Socios'));
+  const personal = mapaPorId_(leer_('Personal'));
+  const eventos = [];
+  const anotar = function (hora, tipo, quien, que, detalle) { eventos.push({ hora: String(hora || ''), tipo: tipo, quien: quien || '—', que: que, detalle: detalle || '' }); };
+  const monto = function (n) { return 'S/ ' + (Number(n) || 0).toFixed(2); };
+
+  leer_('Bitacora').forEach(function (b) {
+    if (b.fecha === fecha) anotar(b.hora, 'acciones', b.usuario, b.accion, b.detalle);
+  });
+  leer_('Ventas').forEach(function (v) {
+    if (v.fecha !== fecha) return;
+    const items = (v.items || []).map(function (i) { return i.cant + '× ' + i.nombre; }).join(', ');
+    const que = 'Venta N° ' + v.numero + (v.medio === 'cuenta' ? ' a la cuenta de ' + nombreSocio_(socios[v.socio_id]) : '') + (v.estado === 'anulada' ? ' (anulada después)' : '');
+    anotar(v.hora, 'barra', v.atendido_por, que, [items, monto(v.total), v.medio === 'cuenta' ? '' : MEDIOS[v.medio] || v.medio, v.mesa ? 'mesa ' + v.mesa : ''].filter(String).join(' · '));
+  });
+  leer_('Ingresos').forEach(function (i) {
+    if (i.fecha !== fecha) return;
+    const s = socios[i.socio_id];
+    const quien = i.tipo === 'socio' ? nombreSocio_(s) : i.nombre;
+    if (i.tipo === 'invitado') anotar(i.hora, 'porteria', i.registrado_por, 'Entró el invitado ' + i.nombre, 'De ' + nombreSocio_(s) + ' · ' + (Number(i.tarifa) > 0 ? monto(i.tarifa) + ' · ' + (MEDIOS[i.medio] || i.medio) : 'sin costo'));
+    else if (i.tipo === 'familiar') anotar(i.hora, 'porteria', i.registrado_por, 'Entró ' + i.nombre, 'Familia de ' + nombreSocio_(s));
+    else anotar(i.hora, 'porteria', i.registrado_por, 'Entró el socio ' + nombreSocio_(s), s ? 'Socio ' + s.codigo : '');
+    if (i.salida) anotar(i.salida, 'porteria', 'Portería', 'Salió ' + quien, '');
+  });
+  leer_('Asistencia').forEach(function (a) {
+    if (a.fecha !== fecha) return;
+    const p = personal[a.personal_id];
+    const nombre = p ? p.nombres + ' ' + p.apellidos : 'Trabajador';
+    if (a.entrada) anotar(a.entrada, 'personal', nombre, 'Marcó su entrada', Number(a.tardanza_min) > 0 ? 'Llegó ' + a.tardanza_min + ' min tarde' : 'A tiempo');
+    if (a.salida) anotar(a.salida, 'personal', nombre, 'Marcó su salida', '');
+  });
+
+  eventos.sort(function (a, b) { return b.hora.localeCompare(a.hora); });
+  return { fecha: fecha, hoy: hoy_(), eventos: eventos };
 }
 
 function cajaDia_(d) {

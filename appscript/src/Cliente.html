@@ -16,6 +16,7 @@
   function esc(v) {
     return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
   }
+  window.ICONOS.historial = window.ICONOS.historial || '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /> <path d="M3 3v5h5" /> <path d="M12 7v5l4 2" />';
   function ic(n) {
     return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (window.ICONOS[n] || '') + '</svg>';
   }
@@ -180,6 +181,12 @@
       'Toca un alquiler para <b>cobrar el saldo</b>, marcarlo como realizado o cancelarlo.',
       'Al rincón parrillero se le puede sumar el <b>uso de cocina</b> (S/ 400).',
       'El sistema no deja alquilar el mismo ambiente dos veces el mismo día.',
+    ]],
+    historial: ['Cómo funciona el historial', [
+      'Muestra <b>todo lo que pasó</b> en el sistema en un día, del más reciente al más antiguo: qué se hizo, quién lo hizo y a qué hora.',
+      'Filtra por <b>Administración</b> (pagos, socios, caja, alquileres, avisos y ajustes), <b>Barra</b>, <b>Portería</b> o <b>Personal</b>, o busca por nombre.',
+      'Con <b>Día anterior</b> revisas cualquier día pasado.',
+      'Es solo para revisar: desde aquí no se puede borrar ni cambiar nada.',
     ]],
     avisos: ['Cómo funcionan los avisos', [
       'Escribe un <b>título</b> corto y el <b>mensaje</b>.',
@@ -504,7 +511,7 @@
   var NAV = {
     inicio: ['Inicio', 'inicio'], porteria: ['Portería', 'porteria'], socios: ['Socios', 'socios'], barra: ['Barra', 'barra'],
     caja: ['Caja', 'caja'], personal: ['Personal', 'personal'], reservas: ['Tenis', 'reservas'], alquileres: ['Alquileres', 'alquileres'],
-    avisos: ['Avisos', 'avisos'], ajustes: ['Ajustes', 'ajustes'], micuenta: ['Mi cuenta', 'inicio'], carnet: ['Carnet', 'carnet'], socio: ['Socios', 'socios'],
+    avisos: ['Avisos', 'avisos'], ajustes: ['Ajustes', 'ajustes'], historial: ['Historial', 'historial'], micuenta: ['Mi cuenta', 'inicio'], carnet: ['Carnet', 'carnet'], socio: ['Socios', 'socios'],
   };
 
   function ir(vista, params) {
@@ -668,7 +675,7 @@
   function pintarMarco() {
     var items = MENU[E.perfil.rol];
     if (!E.vista) E.vista = almacen.get('cp_vista') || items[0];
-    var permitidas = items.concat(E.perfil.rol === 'admin' ? ['ajustes'] : []).concat(E.perfil.rol === 'admin' || E.perfil.rol === 'directiva' ? ['socio'] : []);
+    var permitidas = items.concat(E.perfil.rol === 'admin' ? ['ajustes'] : []).concat(E.perfil.rol === 'admin' || E.perfil.rol === 'directiva' ? ['socio', 'historial'] : []);
     if (permitidas.indexOf(E.vista) < 0) E.vista = items[0];
     var movil = items.length > 4 ? items.slice(0, 4) : items;
     var quien = E.perfil.nombre === E.perfil.rolNombre ? E.perfil.rolNombre : E.perfil.rolNombre + ' · ' + E.perfil.nombre;
@@ -687,7 +694,7 @@
     pintarVista();
   }
   ACC.masMenu = function () {
-    var items = MENU[E.perfil.rol].slice(4).concat(E.perfil.rol === 'admin' ? ['ajustes'] : []);
+    var items = MENU[E.perfil.rol].slice(4).concat(E.perfil.rol === 'admin' || E.perfil.rol === 'directiva' ? ['historial'] : []).concat(E.perfil.rol === 'admin' ? ['ajustes'] : []);
     abrirModal(modalCab('Más opciones') + '<div class="lista">' + items.map(function (v) {
       return '<div class="fila boton" data-a="ir" data-v="' + v + '"><span class="icono-circulo azul">' + ic(NAV[v][1]) + '</span><div class="principal"><div class="nombre">' + NAV[v][0] + '</div></div>' + ic('derecha') + '</div>';
     }).join('') + '</div>');
@@ -1348,7 +1355,8 @@
       if (!vigente(n)) return;
       E.hoy = d.hoy;
       var admin = E.perfil.rol === 'admin', esHoy = d.fecha === d.hoy;
-      var acc = admin && esHoy ? '<button class="btn btn-primario" data-a="movimiento">' + ic('mas') + 'Nuevo movimiento</button><button class="btn" data-a="cerrarCaja" data-esperado="' + d.efectivo + '">' + ic('check') + 'Cerrar caja</button>' : '';
+      var acc = (admin && esHoy ? '<button class="btn btn-primario" data-a="movimiento">' + ic('mas') + 'Nuevo movimiento</button><button class="btn" data-a="cerrarCaja" data-esperado="' + d.efectivo + '">' + ic('check') + 'Cerrar caja</button>' : '') +
+        '<button class="btn" data-a="ir" data-v="historial" data-fecha="' + d.fecha + '">' + ic('historial') + 'Historial del día</button>';
       var nav = '<div class="centro-x mb"><div class="chips"><button class="chip" data-a="diaCaja" data-v="' + sumarDias(d.fecha, -1) + '">' + ic('izquierda') + 'Día anterior</button>' +
         '<button class="chip activo">' + esc(diaRelativo(d.fecha, d.hoy)) + '</button>' +
         '<button class="chip" data-a="diaCaja" data-v="' + sumarDias(d.fecha, 1) + '"' + (esHoy ? ' disabled' : '') + '>Día siguiente' + ic('derecha') + '</button></div></div>';
@@ -1396,6 +1404,51 @@
       pintarVista();
     }).catch(function (e) { ocupado(btn, false); fallo(e); });
   };
+
+  // ================= HISTORIAL =================
+  var TIPOS_HIST = { acciones: ['Administración', 'editar', 'azul'], barra: ['Barra', 'barra', 'sol'], porteria: ['Portería', 'porteria', 'azul'], personal: ['Personal', 'personal', 'ok'] };
+  VISTAS.historial = function (c, n) {
+    return llamar('historial', { fecha: E.params.fecha }).then(function (d) {
+      if (!vigente(n)) return;
+      E.datos.historial = d;
+      E.filtroHist = E.filtroHist || 'todo';
+      var esHoy = d.fecha === d.hoy;
+      var cuantos = function (t) { return d.eventos.filter(function (e) { return t === 'todo' || e.tipo === t; }).length; };
+      var nav = '<div class="centro-x mb"><div class="chips"><button class="chip" data-a="diaHist" data-v="' + sumarDias(d.fecha, -1) + '">' + ic('izquierda') + 'Día anterior</button>' +
+        '<button class="chip activo">' + esc(diaRelativo(d.fecha, d.hoy)) + '</button>' +
+        '<button class="chip" data-a="diaHist" data-v="' + sumarDias(d.fecha, 1) + '"' + (esHoy ? ' disabled' : '') + '>Día siguiente' + ic('derecha') + '</button></div></div>';
+      var filtros = [['todo', 'Todo']].concat(Object.keys(TIPOS_HIST).map(function (k) { return [k, TIPOS_HIST[k][0]]; })).map(function (f) {
+        return '<button class="chip' + (E.filtroHist === f[0] ? ' activo' : '') + '" data-a="filtroHist" data-v="' + f[0] + '">' + f[1] + ' · ' + cuantos(f[0]) + '</button>';
+      }).join('');
+      c.innerHTML = hero({ etiqueta: 'Historial', icono: 'historial', titulo: 'Historial del ' + fechaLarga(d.fecha), sub: 'Todo lo que pasó en el sistema ese día: qué se hizo, quién lo hizo y a qué hora.', ayuda: 'historial' }) + nav +
+        '<section class="tarjeta"><div class="tarjeta-cab"><div><h2>Movimientos del día</h2><p>' + plural(d.eventos.length, 'movimiento', 'movimientos') + ', del más reciente al más antiguo</p></div></div>' +
+        '<div class="chips mb" id="filtrosHist">' + filtros + '</div>' +
+        '<div class="herramientas mb"><div class="buscador">' + ic('buscar') + '<input class="entrada" type="search" placeholder="Buscar por nombre, acción o N° de venta" data-in="buscarHist" id="buscarHist" aria-label="Buscar en el historial"></div></div>' +
+        '<div class="lista" id="listaHist"></div></section>';
+      pintarHistorial();
+    });
+  };
+  function pintarHistorial() {
+    var d = E.datos.historial, lista = $('#listaHist');
+    if (!d || !lista) return;
+    var limpio = function (t) { return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); };
+    var q = limpio(($('#buscarHist') || {}).value).trim();
+    var filas = d.eventos.filter(function (e) {
+      return (E.filtroHist === 'todo' || e.tipo === E.filtroHist) && (!q || limpio(e.que + ' ' + e.quien + ' ' + e.detalle).indexOf(q) >= 0);
+    });
+    lista.innerHTML = filas.length ? filas.map(function (e) {
+      var t = TIPOS_HIST[e.tipo] || TIPOS_HIST.acciones;
+      return '<div class="fila"><span class="hora">' + esc(e.hora) + '</span><span class="icono-circulo ' + t[2] + '">' + ic(t[1]) + '</span>' +
+        '<div class="principal"><div class="nombre">' + esc(e.que) + '</div><div class="meta" style="white-space:normal">' + esc(e.quien) + (e.detalle ? ' · ' + esc(e.detalle) : '') + '</div></div></div>';
+    }).join('') : vacio('historial', d.eventos.length ? 'Nada coincide con lo que buscas.' : 'No hubo movimientos este día.');
+  }
+  ACC.diaHist = function (el) { ir('historial', { fecha: el.dataset.v }); };
+  ACC.filtroHist = function (el) {
+    E.filtroHist = el.dataset.v;
+    document.querySelectorAll('#filtrosHist .chip').forEach(function (b) { b.classList.toggle('activo', b === el); });
+    pintarHistorial();
+  };
+  ENTRADA.buscarHist = function () { pintarHistorial(); };
 
   // ================= PERSONAL =================
   VISTAS.personal = function (c, n) {
@@ -1653,6 +1706,8 @@
         '<div class="pila"><section class="tarjeta"><h2>Usuarios del personal</h2><div class="lista mt">' + d.usuarios.map(function (u) {
           return '<div class="fila"><span class="icono-circulo azul">' + ic('usuario') + '</span><div class="principal"><div class="nombre">' + esc(u.usuario) + '</div><div class="meta">' + esc(u.rol) + '</div></div><button class="btn btn-sm" data-a="claveUsuario" data-id="' + u.id + '" data-u="' + esc(u.usuario) + '">' + ic('llave') + 'Cambiar clave</button></div>';
         }).join('') + '</div></section>' +
+        '<section class="tarjeta"><h2>Historial</h2><p class="sub mt">Todo lo que pasó en el sistema, día por día: qué se hizo, quién lo hizo y a qué hora.</p>' +
+        '<div class="acciones"><button class="btn" data-a="ir" data-v="historial">' + ic('historial') + 'Ver historial</button></div></section>' +
         '<section class="tarjeta"><h2>Base de datos</h2><p class="sub mt">Todo se guarda en una hoja de Google Sheets que puedes abrir, filtrar o descargar.</p>' +
         '<div class="acciones"><a class="btn" href="' + esc(d.hojaUrl) + '" target="_blank" rel="noopener">' + ic('hoja') + 'Abrir en Google Sheets</a></div>' +
         (ejemplo && ejemplo.valor === 'SI' ? '<div class="nota alerta mt">' + ic('alerta') + '<span>El sistema tiene datos de ejemplo. Antes de la presentación puedes dejarlos como al inicio.</span></div><div class="acciones"><button class="btn btn-peligro" data-a="reiniciarEjemplo">' + ic('recargar') + 'Reiniciar datos de ejemplo</button></div>' : '') +
